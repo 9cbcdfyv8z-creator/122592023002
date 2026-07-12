@@ -4,7 +4,6 @@ import axios from "axios";
 
 type BorrowItem = any;
 export default function AdminBorrowAudit() {
-    // 修复SSR报错
     const [token, setToken] = useState<string>("");
     const [filterType, setFilterType] = useState("all");
     const [borrowList, setBorrowList] = useState<BorrowItem[]>([]);
@@ -27,7 +26,6 @@ export default function AdminBorrowAudit() {
         if (token) loadBorrow();
     }, [filterType, token]);
 
-    // 审批通过/驳回
     const auditOperate = async (borrowId: number, status: number) => {
         await axios.put(`http://127.0.0.1:5000/api/admin/borrow/audit/${borrowId}`, { status }, {
             headers: { Authorization: `Bearer ${token}` }
@@ -73,9 +71,9 @@ export default function AdminBorrowAudit() {
                         {borrowList.map(item => (
                             <tr key={item[0]}>
                                 <td className="border p-3 text-center">{item[0]}</td>
-                                <td className="border p-3 text-center">{item[9]}</td>
-                                <td className="border p-3 text-center">{item[10]}</td>
-                                <td className="border p-3 text-center">{item[3]}</td>
+                                <td className="border p-3 text-center">{item[2]}</td>
+                                <td className="border p-3 text-center">{item[4]}</td>
+                                <td className="border p-3 text-center">{item[5]}</td>
                                 <td className="border p-3 text-center">{item[6]}</td>
                                 <td className="border p-3 text-center">{item[7] || "-"}</td>
                                 <td className="border p-3 text-center">{statusMap[item[8]]}</td>

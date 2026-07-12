@@ -12,6 +12,14 @@ type UserInfo = {
     role: string;
 } | null;
 
+const statusMap = {
+    0: "待审批",
+    1: "借阅中",
+    2: "已驳回",
+    3: "已归还",
+    4: "逾期未还"
+};
+
 export default function Profile() {
     const [tab, setTab] = useState("info");
     const [user, setUser] = useState<UserInfo>(null);
@@ -20,13 +28,11 @@ export default function Profile() {
     const [token, setToken] = useState<string>("");
     const [loading, setLoading] = useState(true);
 
-    // 仅客户端读取token，规避SSR localStorage报错
     useEffect(() => {
         const savedToken = localStorage.getItem("token") ?? "";
         setToken(savedToken);
     }, []);
 
-    // 请求个人资料
     useEffect(() => {
         if (!token) {
             setLoading(false);
@@ -48,7 +54,6 @@ export default function Profile() {
         fetchProfile();
     }, [token]);
 
-    // 请求我的收藏
     useEffect(() => {
         if (!token) return;
         const fetchCollect = async () => {
@@ -64,7 +69,6 @@ export default function Profile() {
         fetchCollect();
     }, [token]);
 
-    // 请求我的借阅记录
     useEffect(() => {
         if (!token) return;
         const fetchBorrow = async () => {
@@ -80,28 +84,30 @@ export default function Profile() {
         fetchBorrow();
     }, [token]);
 
-    // 归还图书
+    // 关键改动：post改为put修复405报错
     const returnBook = async (borrowId: number) => {
         if (!confirm("确认归还这本图书？")) return;
-        await axios.post(`http://127.0.0.1:5000/api/borrow/return/${borrowId}`, {}, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        alert("归还成功！");
-        // 刷新借阅列表
-        const res = await axios.get("http://127.0.0.1:5000/api/borrow/my", {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        setBorrowList(res.data.data);
+        try {
+            await axios.put(`http://127.0.0.1:5000/api/borrow/return/${borrowId}`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert("归还成功！");
+            const res = await axios.get("http://127.0.0.1:5000/api/borrow/my", {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setBorrowList(res.data.data);
+        } catch (err) {
+            console.error(err);
+            alert("归还失败，请检查后端接口请求方式");
+        }
     };
 
-    // 加载/空状态兜底
     if (loading) return <div className="text-center mt-20 text-xl">加载个人资料中...</div>;
     if (!token) return <div className="text-center mt-20 text-xl">请登录后访问个人中心</div>;
     if (!user) return <div className="text-center mt-20 text-xl">暂无用户数据</div>;
 
     return (
         <div className="max-w-5xl mx-auto p-5">
-            {/* 标签切换 */}
             <div className="flex gap-4 mb-6 border-b pb-3">
                 <button
                     onClick={() => setTab("info")}
@@ -123,7 +129,6 @@ export default function Profile() {
                 </button>
             </div>
 
-            {/* 个人资料面板 */}
             {tab === "info" && (
                 <div className="space-y-5 mt-4">
                     <div className="flex items-center gap-3">
@@ -159,7 +164,6 @@ export default function Profile() {
                 </div>
             )}
 
-            {/* 我的收藏面板（增加封面展示） */}
             {tab === "collect" && (
                 <div className="mt-4">
                     {collectList.length === 0 ? (
@@ -189,7 +193,6 @@ export default function Profile() {
                 </div>
             )}
 
-            {/* 我的借阅面板 */}
             {tab === "borrow" && (
                 <div className="mt-4">
                     {borrowList.length === 0 ? (
@@ -215,9 +218,9 @@ export default function Profile() {
                                         <td className="border p-3 text-center">{row[5]}</td>
                                         <td className="border p-3 text-center">{row[6]}</td>
                                         <td className="border p-3 text-center">{row[7] ?? "-"}</td>
-                                        <td className="border p-3 text-center">{row[8]}</td>
+                                        <td className="border p-3 text-center">{statusMap[row[8]]}</td>
                                         <td className="border p-3 text-center">
-                                            {row[8] === "借阅中" && (
+                                            {row[8] === 1 && (
                                                 <button onClick={() => returnBook(row[0])} className="bg-green-500 text-white px-3 py-1 rounded">归还图书</button>
                                             )}
                                         </td>
