@@ -7,12 +7,19 @@
     --primary-light: #60a5fa;
 }
 
+body {
+    font-family: "Microsoft YaHei", sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f8fafc;
+}
+
 .card-shadow {
     box-shadow: 0 2px 12px rgba(0,0,0,0.08);
 }
 
 .book-card {
-    transition: all 0.2s;
+    transition: all 0.2s ease;
 }
 
     .book-card:hover {
