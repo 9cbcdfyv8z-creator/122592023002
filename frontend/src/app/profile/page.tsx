@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import Link from "next/link";
 
 type UserInfo = {
     id: number;
@@ -15,6 +16,7 @@ export default function Profile() {
     const [tab, setTab] = useState("info");
     const [user, setUser] = useState<UserInfo>(null);
     const [collectList, setCollectList] = useState<any[]>([]);
+    const [borrowList, setBorrowList] = useState<any[]>([]);
     const [token, setToken] = useState<string>("");
     const [loading, setLoading] = useState(true);
 
@@ -62,6 +64,36 @@ export default function Profile() {
         fetchCollect();
     }, [token]);
 
+    // 请求我的借阅记录
+    useEffect(() => {
+        if (!token) return;
+        const fetchBorrow = async () => {
+            try {
+                const res = await axios.get("http://127.0.0.1:5000/api/borrow/my", {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setBorrowList(res.data.data);
+            } catch (e) {
+                console.error("借阅记录加载失败", e);
+            }
+        };
+        fetchBorrow();
+    }, [token]);
+
+    // 归还图书
+    const returnBook = async (borrowId: number) => {
+        if (!confirm("确认归还这本图书？")) return;
+        await axios.post(`http://127.0.0.1:5000/api/borrow/return/${borrowId}`, {}, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        alert("归还成功！");
+        // 刷新借阅列表
+        const res = await axios.get("http://127.0.0.1:5000/api/borrow/my", {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        setBorrowList(res.data.data);
+    };
+
     // 加载/空状态兜底
     if (loading) return <div className="text-center mt-20 text-xl">加载个人资料中...</div>;
     if (!token) return <div className="text-center mt-20 text-xl">请登录后访问个人中心</div>;
@@ -82,6 +114,12 @@ export default function Profile() {
                     className={`px-4 py-2 rounded-lg ${tab === "collect" ? "bg-blue-500 text-white" : "border border-gray-300"}`}
                 >
                     我的收藏
+                </button>
+                <button
+                    onClick={() => setTab("borrow")}
+                    className={`px-4 py-2 rounded-lg ${tab === "borrow" ? "bg-blue-500 text-white" : "border border-gray-300"}`}
+                >
+                    我的借阅
                 </button>
             </div>
 
@@ -121,7 +159,7 @@ export default function Profile() {
                 </div>
             )}
 
-            {/* 我的收藏面板 */}
+            {/* 我的收藏面板（增加封面展示） */}
             {tab === "collect" && (
                 <div className="mt-4">
                     {collectList.length === 0 ? (
@@ -129,13 +167,66 @@ export default function Profile() {
                     ) : (
                         <div className="grid grid-cols-3 gap-4 mt-4">
                             {collectList.map((book) => (
-                                <div key={book[0]} className="border rounded-lg p-4 shadow-sm">
+                                <Link key={book[0]} href={`/book/${book[0]}`} className="border rounded-lg p-4 shadow-sm block">
+                                    <div className="h-40 bg-slate-100 rounded mb-3 overflow-hidden">
+                                        <img
+                                            src={book[6]}
+                                            alt={book[1]}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                const target = e.target as HTMLImageElement;
+                                                target.style.display = "none";
+                                                target.parentElement!.innerHTML = `<div class="h-full flex items-center justify-center text-5xl">📖</div>`;
+                                            }}
+                                        />
+                                    </div>
                                     <h3 className="font-bold text-lg">{book[1]}</h3>
                                     <p className="text-gray-500">作者：{book[2]}</p>
-                                </div>
+                                </Link>
                             ))}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* 我的借阅面板 */}
+            {tab === "borrow" && (
+                <div className="mt-4">
+                    {borrowList.length === 0 ? (
+                        <p className="text-gray-500 mt-4">暂无借阅记录</p>
+                    ) : (
+                        <table className="w-full border-collapse bg-white shadow">
+                            <thead className="bg-gray-100">
+                                <tr>
+                                    <th className="border p-3">借阅ID</th>
+                                    <th className="border p-3">图书名称</th>
+                                    <th className="border p-3">申请日期</th>
+                                    <th className="border p-3">应还日期</th>
+                                    <th className="border p-3">归还日期</th>
+                                    <th className="border p-3">审批状态</th>
+                                    <th className="border p-3">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {borrowList.map(row => (
+                                    <tr key={row[0]}>
+                                        <td className="border p-3 text-center">{row[0]}</td>
+                                        <td className="border p-3 text-center">{row[4]}</td>
+                                        <td className="border p-3 text-center">{row[5]}</td>
+                                        <td className="border p-3 text-center">{row[6]}</td>
+                                        <td className="border p-3 text-center">{row[7] ?? "-"}</td>
+                                        <td className="border p-3 text-center">{row[8]}</td>
+                                        <td className="border p-3 text-center">
+                                            {row[8] === "借阅中" && (
+                                                <button onClick={() => returnBook(row[0])} className="bg-green-500 text-white px-3 py-1 rounded">归还图书</button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                    <p className="mt-4 text-sm text-gray-500">提示：管理员审批结果实时刷新，借阅中状态可归还图书</p>
                 </div>
             )}
         </div>

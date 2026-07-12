@@ -4,11 +4,19 @@ import axios from "axios";
 
 type BorrowItem = any;
 export default function AdminBorrowAudit() {
-    const token = localStorage.getItem("token");
+    // 修复SSR报错
+    const [token, setToken] = useState<string>("");
     const [filterType, setFilterType] = useState("all");
     const [borrowList, setBorrowList] = useState<BorrowItem[]>([]);
 
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            setToken(localStorage.getItem("token") ?? "");
+        }
+    }, []);
+
     const loadBorrow = async () => {
+        if (!token) return;
         const res = await axios.get(`http://127.0.0.1:5000/api/admin/borrow/list?filter=${filterType}`, {
             headers: { Authorization: `Bearer ${token}` }
         });
@@ -16,8 +24,8 @@ export default function AdminBorrowAudit() {
     };
 
     useEffect(() => {
-        loadBorrow();
-    }, [filterType]);
+        if (token) loadBorrow();
+    }, [filterType, token]);
 
     // 审批通过/驳回
     const auditOperate = async (borrowId: number, status: number) => {

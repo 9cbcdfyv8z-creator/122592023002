@@ -36,12 +36,26 @@ export default function Home() {
 
                 // 热门图书
                 const hotRes = await axios.get("http://127.0.0.1:5000/api/recommend/hot");
-                setHotBooks(hotRes.data.data.slice(0, 4)); // 首页只展示前4本
+                setHotBooks(hotRes.data.data.slice(0, 4));
 
-                // 个性化推荐（传token区分登录用户）
-                const recConfig = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-                const recRes = await axios.get("http://127.0.0.1:5000/api/recommend/personal", recConfig);
-                setRecommendBooks(recRes.data.data);
+                // 个性化推荐：无数据自动兜底热门图书
+                if (token) {
+                    try {
+                        const recRes = await axios.get("http://127.0.0.1:5000/api/recommend/personal", {
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+                        if (recRes.data.data.length > 0) {
+                            setRecommendBooks(recRes.data.data);
+                        } else {
+                            setRecommendBooks(hotRes.data.data.slice(4, 8));
+                        }
+                    } catch (err) {
+                        setRecommendBooks(hotRes.data.data.slice(4, 8));
+                    }
+                } else {
+                    // 未登录直接展示热门兜底
+                    setRecommendBooks(hotRes.data.data.slice(4, 8));
+                }
             } catch (err) {
                 console.error("首页数据加载失败", err);
             }
