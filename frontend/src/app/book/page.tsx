@@ -3,84 +3,84 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 
 type BookItem = {
-    id: number;
-    name: string;
-    author: string;
+  id: number;
+  name: string;
+  author: string;
 };
 
 export default function BookManagePage() {
-    const [bookList, setBookList] = useState<BookItem[]>([]);
-    const [newBookName, setNewBookName] = useState("");
-    const [newAuthor, setNewAuthor] = useState("");
+  const [bookList, setBookList] = useState<BookItem[]>([]);
+  const [newBookName, setNewBookName] = useState("");
+  const [newAuthor, setNewAuthor] = useState("");
 
-    const fetchBookData = async () => {
-        const res = await axios.get("http://127.0.0.1:5000/api/book");
-        setBookList(res.data.data);
-    };
+  const fetchBookData = async () => {
+    const res = await axios.get("http://127.0.0.1:5000/api/book");
+    setBookList(res.data.data);
+  };
 
-    useEffect(() => {
-        fetchBookData();
-    }, []);
+  useEffect(() => {
+    fetchBookData();
+  }, []);
 
-    const submitAddBook = async () => {
-        if (!newBookName || !newAuthor) {
-            alert("Í¼ÊéÃû³ÆºÍ×÷Õß²»ÄÜÎª¿Õ");
-            return;
-        }
-        await axios.post("http://127.0.0.1:5000/api/book", {
-            name: newBookName,
-            author: newAuthor,
-        });
-        setNewBookName("");
-        setNewAuthor("");
-        fetchBookData();
-    };
+  const submitAddBook = async () => {
+    if (!newBookName || !newAuthor) {
+      alert("å›¾ä¹¦åç§°å’Œä½œè€…ä¸èƒ½ä¸ºç©º");
+      return;
+    }
+    await axios.post("http://127.0.0.1:5000/api/book", {
+      name: newBookName,
+      author: newAuthor,
+    });
+    setNewBookName("");
+    setNewAuthor("");
+    fetchBookData();
+  };
 
-    return (
-        <div className="max-w-3xl mx-auto mt-10 p-4">
-            <h2 className="text-xl mb-5 text-center">Í¼Êé¹ÜÀíÃæ°å</h2>
-            <div className="border p-4 rounded mb-6">
-                <h3 className="mb-3">ĞÂÔöÍ¼Êé</h3>
-                <div className="flex gap-3 mb-3">
-                    <input
-                        className="border p-2 flex-1"
-                        placeholder="ÊäÈëÍ¼ÊéÃû³Æ"
-                        value={newBookName}
-                        onChange={(e) => setNewBookName(e.target.value)}
-                    />
-                    <input
-                        className="border p-2 flex-1"
-                        placeholder="ÊäÈë×÷ÕßĞÕÃû"
-                        value={newAuthor}
-                        onChange={(e) => setNewAuthor(e.target.value)}
-                    />
-                </div>
-                <button
-                    onClick={submitAddBook}
-                    className="bg-green-500 text-white px-4 py-2 rounded"
-                >
-                    Ìí¼ÓÍ¼Êé
-                </button>
-            </div>
-            <h3 className="mb-3">È«²¿Í¼ÊéÁĞ±í</h3>
-            <table className="w-full border">
-                <thead className="bg-gray-100">
-                    <tr>
-                        <th className="border p-2">±àºÅID</th>
-                        <th className="border p-2">Í¼ÊéÃû³Æ</th>
-                        <th className="border p-2">×÷Õß</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {bookList.map((bk) => (
-                        <tr key={bk.id}>
-                            <td className="border p-2 text-center">{bk.id}</td>
-                            <td className="border p-2 text-center">{bk.name}</td>
-                            <td className="border p-2 text-center">{bk.author}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+  return (
+    <div className="max-w-3xl mx-auto mt-10 p-4">
+      <h2 className="text-xl mb-5 text-center">å›¾ä¹¦ç®¡ç†é¢æ¿</h2>
+      <div className="border p-4 rounded mb-6">
+        <h3 className="mb-3">æ–°å¢å›¾ä¹¦</h3>
+        <div className="flex gap-3 mb-3">
+          <input
+            className="border p-2 flex-1"
+            placeholder="è¾“å…¥å›¾ä¹¦åç§°"
+            value={newBookName}
+            onChange={(e) => setNewBookName(e.target.value)}
+          />
+          <input
+            className="border p-2 flex-1"
+            placeholder="è¾“å…¥ä½œè€…å§“å"
+            value={newAuthor}
+            onChange={(e) => setNewAuthor(e.target.value)}
+          />
         </div>
-    );
+        <button
+          onClick={submitAddBook}
+          className="bg-green-500 text-white px-4 py-2 rounded"
+        >
+          æ·»åŠ å›¾ä¹¦
+        </button>
+      </div>
+      <h3 className="mb-3">å…¨éƒ¨å›¾ä¹¦åˆ—è¡¨</h3>
+      <table className="w-full border">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="border p-2">ç¼–å·ID</th>
+            <th className="border p-2">å›¾ä¹¦åç§°</th>
+            <th className="border p-2">ä½œè€…</th>
+          </tr>
+        </thead>
+        <tbody>
+          {bookList.map((bk) => (
+            <tr key={bk.id}>
+              <td className="border p-2 text-center">{bk.id}</td>
+              <td className="border p-2 text-center">{bk.name}</td>
+              <td className="border p-2 text-center">{bk.author}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }

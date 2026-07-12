@@ -1,58 +1,74 @@
 "use client";
-import axios from "axios";
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
-export default function LoginPage() {
-    const [username, setUsername] = useState("");
-    const [pwd, setPwd] = useState("");
+export default function Login() {
     const router = useRouter();
+    const [username, setUsername] = useState("admin");
+    const [pwd, setPwd] = useState("123456");
+    const [remember, setRemember] = useState(false);
 
     const handleLogin = async () => {
-        try {
-            const res = await axios.post("http://127.0.0.1:5000/api/login", {
-                username,
-                pwd,
-            });
-            if (res.data.code === 200) {
-                alert("µÇÂ¼³É¹¦£¬Ìø×ªÍ¼Êé¹ÜÀíÒ³");
-                router.push("/book");
-            } else {
-                alert("ÕËºÅ»òÃÜÂë´íÎó");
-            }
-        } catch (err) {
-            alert("ºó¶Ë·şÎñÎ´Æô¶¯£¬ÇëÏÈÔËĞĞbackend/app.py");
+        const res = await axios.post("http://127.0.0.1:5000/api/login", { username, pwd });
+        if (res.data.code === 200) {
+            localStorage.setItem("token", res.data.data.token);
+            alert("ç™»å½•æˆåŠŸ");
+            router.push("/");
+        } else {
+            alert(res.data.msg);
         }
     };
 
     return (
-        <div className="max-w-md mx-auto mt-20 p-5 border rounded-lg shadow">
-            <h2 className="text-xl mb-4 text-center">Í¼ÊéÏµÍ³µÇÂ¼</h2>
-            <div className="mb-3">
-                <label>ÓÃ»§Ãû</label>
-                <input
-                    className="w-full border p-2 mt-1"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="admin"
-                />
+        <div className="min-h-[80vh] flex items-center justify-center">
+            <div className="w-full max-w-5xl flex rounded-xl overflow-hidden card-shadow">
+                {/* å·¦ä¾§è“è‰²å®£ä¼ åŒº */}
+                <div className="w-1/2 bg-gradient-to-br from-blue-400 to-blue-600 text-white p-16 flex flex-col justify-center">
+                    <h1 className="text-5xl font-bold mb-6">å›¾ä¹¦ç®¡ç†ç³»ç»Ÿ</h1>
+                    <p className="text-lg opacity-90 mb-10">â€”â€” æ¢ç´¢çŸ¥è¯†çš„æµ·æ´‹ï¼Œå‘ç°é˜…è¯»çš„æ— é™å¯èƒ½ â€”â€”</p>
+                    <div className="opacity-60 text-9xl">ğŸ“š</div>
+                </div>
+                {/* å³ä¾§ç™»å½•è¡¨å• */}
+                <div className="w-1/2 bg-white p-16 flex flex-col justify-center">
+                    <h2 className="text-3xl font-bold text-gray-800 text-center mb-2">æ¬¢è¿å›æ¥</h2>
+                    <p className="text-gray-500 text-center mb-10">ç™»å½•æ‚¨çš„è´¦å·ï¼Œç»§ç»­æ‚¨çš„é˜…è¯»ä¹‹æ—…</p>
+
+                    <div className="space-y-5">
+                        <input
+                            className="w-full border border-gray-200 rounded-lg px-4 py-3 focus:border-blue-500 outline-none"
+                            placeholder="ç”¨æˆ·å"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                        />
+                        <input
+                            type="password"
+                            className="w-full border border-gray-200 rounded-lg px-4 py-3 focus:border-blue-500 outline-none"
+                            placeholder="å¯†ç "
+                            value={pwd}
+                            onChange={(e) => setPwd(e.target.value)}
+                        />
+                        <div className="flex justify-between items-center text-sm">
+                            <label className="flex items-center gap-2">
+                                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+                                è®°ä½æˆ‘
+                            </label>
+                            <span className="text-blue-500 cursor-pointer">å¿˜è®°å¯†ç ï¼Ÿ</span>
+                        </div>
+                        <button
+                            onClick={handleLogin}
+                            className="w-full bg-gradient-to-r from-blue-400 to-blue-600 text-white py-3 rounded-lg font-medium text-lg"
+                        >
+                            ç™»å½•
+                        </button>
+                        <p className="text-center text-gray-500 mt-6">
+                            è¿˜æ²¡æœ‰è´¦å·ï¼Ÿ
+                            <Link href="/register" className="text-blue-500 ml-1">ç«‹å³æ³¨å†Œ</Link>
+                        </p>
+                    </div>
+                </div>
             </div>
-            <div className="mb-4">
-                <label>µÇÂ¼ÃÜÂë</label>
-                <input
-                    type="password"
-                    className="w-full border p-2 mt-1"
-                    value={pwd}
-                    onChange={(e) => setPwd(e.target.value)}
-                    placeholder="123456"
-                />
-            </div>
-            <button
-                onClick={handleLogin}
-                className="w-full bg-blue-500 text-white px-4 py-2 rounded"
-            >
-                µÇÂ¼
-            </button>
         </div>
     );
 }
