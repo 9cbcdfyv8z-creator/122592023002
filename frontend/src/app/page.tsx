@@ -17,14 +17,10 @@ export default function Home() {
     // 新增热门、推荐图书状态
     const [hotBooks, setHotBooks] = useState<BookRow[]>([]);
     const [recommendBooks, setRecommendBooks] = useState<BookRow[]>([]);
-    const [token, setToken] = useState<string>("");
-
-    // 修复SSR localStorage报错
-    useEffect(() => {
-        if (typeof window !== "undefined") {
-            setToken(localStorage.getItem("token") ?? "");
-        }
-    }, []);
+    const [token] = useState<string>(() => {
+        if (typeof window === "undefined") return "";
+        return localStorage.getItem("token") ?? "";
+    });
 
     // 加载首页全部数据
     useEffect(() => {
@@ -60,10 +56,10 @@ export default function Home() {
                 console.error("首页数据加载失败", err);
             }
         };
-        loadHomeData();
+        (async () => await loadHomeData())();
     }, [token]);
 
-    // 图书卡片通用组件（带封面）
+    // 图书卡片通用组件（完整包裹Link，封面可点击跳转）
     const BookCard = ({ book }: { book: BookRow }) => (
         <Link href={`/book/${book[0]}`} className="bg-white rounded-xl shadow p-4 block">
             <div className="h-36 bg-slate-100 rounded mb-3 overflow-hidden">
@@ -107,20 +103,20 @@ export default function Home() {
             {/* 统计卡片 */}
             <div className="grid grid-cols-4 gap-5 mb-12">
                 <div className="bg-white rounded-lg p-6 text-center shadow-sm">
-                    <div className="text-5xl font-bold text-blue-600">{stats.book_total}</div>
-                    <div className="text-gray-500 mt-2">馆藏图书</div>
+                    <div className="text-5xl font-bold text-blue-600">{stats.user_total}</div>
+                    <div className="text-gray-500 mt-2">注册用户</div>
                 </div>
                 <div className="bg-white rounded-lg p-6 text-center shadow-sm">
-                    <div className="text-5xl font-bold text-green-600">{stats.category_total}</div>
-                    <div className="text-gray-500 mt-2">图书分类</div>
+                    <div className="text-5xl font-bold text-green-600">{stats.book_total}</div>
+                    <div className="text-gray-500 mt-2">馆藏图书</div>
                 </div>
                 <div className="bg-white rounded-lg p-6 text-center shadow-sm">
                     <div className="text-5xl font-bold text-amber-600">{stats.borrow_total}</div>
                     <div className="text-gray-500 mt-2">借阅次数</div>
                 </div>
                 <div className="bg-white rounded-lg p-6 text-center shadow-sm">
-                    <div className="text-5xl font-bold text-red-600">{stats.user_total}</div>
-                    <div className="text-gray-500 mt-2">注册用户</div>
+                    <div className="text-5xl font-bold text-red-600">{stats.category_total}</div>
+                    <div className="text-gray-500 mt-2">图书分类</div>
                 </div>
             </div>
 

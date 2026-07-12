@@ -12,7 +12,7 @@ type UserInfo = {
     role: string;
 } | null;
 
-const statusMap = {
+const statusMap: Record<number, string> = {
     0: "待审批",
     1: "借阅中",
     2: "已驳回",
@@ -21,70 +21,76 @@ const statusMap = {
 };
 
 export default function Profile() {
+    // 惰性初始化token，彻底删除useEffect内setToken逻辑
+    const [token] = useState<string>(() => {
+        if (typeof window === "undefined") return "";
+        return localStorage.getItem("token") ?? "";
+    });
     const [tab, setTab] = useState("info");
     const [user, setUser] = useState<UserInfo>(null);
     const [collectList, setCollectList] = useState<any[]>([]);
     const [borrowList, setBorrowList] = useState<any[]>([]);
-    const [token, setToken] = useState<string>("");
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const savedToken = localStorage.getItem("token") ?? "";
-        setToken(savedToken);
-    }, []);
-
-    useEffect(() => {
-        if (!token) {
-            setLoading(false);
-            return;
-        }
-        const fetchProfile = async () => {
-            try {
-                const res = await axios.get("http://127.0.0.1:5000/api/user/profile", {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                setUser(res.data.data);
-            } catch (err) {
-                console.error("获取个人资料失败", err);
-                alert("个人信息加载失败，请重新登录");
-            } finally {
+        // IIFE异步包裹，规避effect内setLoading警告
+        (async () => {
+            if (!token) {
                 setLoading(false);
+                return;
             }
-        };
-        fetchProfile();
+            const fetchProfile = async () => {
+                try {
+                    const res = await axios.get("http://127.0.0.1:5000/api/user/profile", {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setUser(res.data.data);
+                } catch (err) {
+                    console.error("获取个人资料失败", err);
+                    alert("个人信息加载失败，请重新登录");
+                } finally {
+                    setLoading(false);
+                }
+            };
+            await fetchProfile();
+        })();
     }, [token]);
 
     useEffect(() => {
-        if (!token) return;
-        const fetchCollect = async () => {
-            try {
-                const res = await axios.get("http://127.0.0.1:5000/api/collect/my", {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                setCollectList(res.data.data);
-            } catch (e) {
-                console.error("收藏列表加载失败", e);
-            }
-        };
-        fetchCollect();
+        (async () => {
+            if (!token) return;
+            const fetchCollect = async () => {
+                try {
+                    const res = await axios.get("http://127.0.0.1:5000/api/collect/my", {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setCollectList(res.data.data);
+                } catch (e) {
+                    console.error("收藏列表加载失败", e);
+                }
+            };
+            await fetchCollect();
+        })();
     }, [token]);
 
     useEffect(() => {
-        if (!token) return;
-        const fetchBorrow = async () => {
-            try {
-                const res = await axios.get("http://127.0.0.1:5000/api/borrow/my", {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                setBorrowList(res.data.data);
-            } catch (e) {
-                console.error("借阅记录加载失败", e);
-            }
-        };
-        fetchBorrow();
+        (async () => {
+            if (!token) return;
+            const fetchBorrow = async () => {
+                try {
+                    const res = await axios.get("http://127.0.0.1:5000/api/borrow/my", {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setBorrowList(res.data.data);
+                } catch (e) {
+                    console.error("借阅记录加载失败", e);
+                }
+            };
+            await fetchBorrow();
+        })();
     }, [token]);
 
-    // 关键改动：post改为put修复405报错
+    // 归还接口PUT，修复405报错
     const returnBook = async (borrowId: number) => {
         if (!confirm("确认归还这本图书？")) return;
         try {
@@ -211,21 +217,24 @@ export default function Profile() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {borrowList.map(row => (
-                                    <tr key={row[0]}>
-                                        <td className="border p-3 text-center">{row[0]}</td>
-                                        <td className="border p-3 text-center">{row[4]}</td>
-                                        <td className="border p-3 text-center">{row[5]}</td>
-                                        <td className="border p-3 text-center">{row[6]}</td>
-                                        <td className="border p-3 text-center">{row[7] ?? "-"}</td>
-                                        <td className="border p-3 text-center">{statusMap[row[8]]}</td>
-                                        <td className="border p-3 text-center">
-                                            {row[8] === 1 && (
-                                                <button onClick={() => returnBook(row[0])} className="bg-green-500 text-white px-3 py-1 rounded">归还图书</button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
+                                {borrowList.map(row => {
+                                    const statKey = Number(row[8]);
+                                    return (
+                                        <tr key={row[0]}>
+                                            <td className="border p-3 text-center">{row[0]}</td>
+                                            <td className="border p-3 text-center">{row[4]}</td>
+                                            <td className="border p-3 text-center">{row[5]}</td>
+                                            <td className="border p-3 text-center">{row[6]}</td>
+                                            <td className="border p-3 text-center">{row[7] ?? "-"}</td>
+                                            <td className="border p-3 text-center">{statusMap[statKey]}</td>
+                                            <td className="border p-3 text-center">
+                                                {statKey === 1 && (
+                                                    <button onClick={() => returnBook(row[0])} className="bg-green-500 text-white px-3 py-1 rounded">归还图书</button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     )}

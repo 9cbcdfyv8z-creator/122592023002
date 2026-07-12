@@ -2,20 +2,26 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import sqlite3
-import time
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 app = Flask(__name__)
-CORS(app)
+# å®Œæ•´ä¿®å¤CORSï¼Œæ”¾è¡ŒOPTIONSé¢„æ£€ã€DELETEæ–¹æ³•ã€Authorizationé‰´æƒå¤´
+CORS(
+    app,
+    supports_credentials=True,
+    origins=["http://localhost:3000"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"]
+)
 SECRET_KEY = "book-system-2026-secret"
 
-# ====================== Êı¾İ¿â³õÊ¼»¯£¨È«²¿ÒµÎñ±í£© ======================
+# ====================== æ•°æ®åº“åˆå§‹åŒ–ï¼ˆå…¨éƒ¨ä¸šåŠ¡è¡¨ï¼‰ ======================
 def init_db():
     conn = sqlite3.connect("book.db")
     cur = conn.cursor()
 
-    # 1. ÓÃ»§±í
+    # 1. ç”¨æˆ·è¡¨
     cur.execute('''
     CREATE TABLE IF NOT EXISTS user(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,10 +35,19 @@ def init_db():
         create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     ''')
-    # ¹ÜÀíÔ±ÕËºÅ admin/123456
-    cur.execute("INSERT OR IGNORE INTO user(username,pwd,role) VALUES (?,?,?)", ("admin", "123456", "admin"))
+    # å…¼å®¹å†å²æ—§åº“ï¼Œè¡¥ä¸Šç¼ºå¤±å­—æ®µ
+    try:
+        cur.execute("ALTER TABLE user ADD COLUMN role TEXT DEFAULT 'user'")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cur.execute("ALTER TABLE user ADD COLUMN status INTEGER DEFAULT 1")
+    except sqlite3.OperationalError:
+        pass
+    # æ”¹åŠ¨ï¼šç»™adminé¢„ç½®nickname=admin
+    cur.execute("INSERT OR IGNORE INTO user(username,pwd,nickname,role,status) VALUES (?,?,?,?,?)", ("admin", "123456", "admin", "admin", 1))
 
-    # 2. Í¼Êé·ÖÀà±í£¨Ê÷ĞÎ½á¹¹ parent_id£©
+    # 2. å›¾ä¹¦åˆ†ç±»è¡¨ï¼ˆæ ‘å½¢ç»“æ„ parent_idï¼‰
     cur.execute('''
     CREATE TABLE IF NOT EXISTS category(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,19 +56,19 @@ def init_db():
         sort INTEGER DEFAULT 0
     )
     ''')
-    # ³õÊ¼»¯·ÖÀà
+    # åˆå§‹åŒ–åˆ†ç±»
     category_list = [
-        (1, "¿Æ¼¼", 0, 1),
-        (2, "ÎÄÑ§", 0, 2),
-        (3, "¾­¼Ã¹ÜÀí", 0, 3),
-        (4, "ÀúÊ·", 0, 4),
-        (5, "±à³ÌÓïÑÔ", 1, 1),
-        (6, "Ğ¡Ëµ", 2, 1)
+        (1, "ç§‘æŠ€", 0, 1),
+        (2, "æ–‡å­¦", 0, 2),
+        (3, "ç»æµç®¡ç†", 0, 3),
+        (4, "å†å²", 0, 4),
+        (5, "ç¼–ç¨‹è¯­è¨€", 1, 1),
+        (6, "å°è¯´", 2, 1)
     ]
     for cid, name, pid, sort in category_list:
         cur.execute("INSERT OR IGNORE INTO category(id,cat_name,parent_id,sort) VALUES (?,?,?,?)", (cid, name, pid, sort))
 
-    # 3. Í¼Êé±í
+    # 3. å›¾ä¹¦è¡¨
     cur.execute('''
     CREATE TABLE IF NOT EXISTS book(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,7 +88,7 @@ def init_db():
     )
     ''')
 
-    # 4. ÊÕ²Ø±í
+    # 4. æ”¶è—è¡¨
     cur.execute('''
     CREATE TABLE IF NOT EXISTS collection(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,7 +101,7 @@ def init_db():
     )
     ''')
 
-    # 5. ½èÔÄ±í status:0´ıÉóÅú 1½è³ö 2²µ»Ø 3¹é»¹ 4ÓâÆÚÎ´»¹
+    # 5. å€Ÿé˜…è¡¨ status:0å¾…å®¡æ‰¹ 1å€Ÿå‡º 2é©³å› 3å½’è¿˜ 4é€¾æœŸæœªè¿˜
     cur.execute('''
     CREATE TABLE IF NOT EXISTS borrow(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -104,7 +119,7 @@ def init_db():
     )
     ''')
 
-    # 6. ÆÀÂÛ±í
+    # 6. è¯„è®ºè¡¨
     cur.execute('''
     CREATE TABLE IF NOT EXISTS comment(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -119,7 +134,7 @@ def init_db():
     )
     ''')
 
-    # 7. ÍÆ¼ö»º´æ±í rec_type:userCF/itemCF/content/hot/new/similar/mix
+    # 7. æ¨èç¼“å­˜è¡¨ rec_type:userCF/itemCF/content/hot/new/similar/mix
     cur.execute('''
     CREATE TABLE IF NOT EXISTS recommend(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -137,9 +152,9 @@ def init_db():
 
 init_db()
 
-# ====================== ¹¤¾ßº¯Êı ======================
+# ====================== å·¥å…·å‡½æ•° ======================
 def get_token_user():
-    """½âÎötoken»ñÈ¡µ±Ç°µÇÂ¼ÓÃ»§"""
+    """è§£ætokenè·å–å½“å‰ç™»å½•ç”¨æˆ·"""
     auth = request.headers.get("Authorization")
     if not auth or not auth.startswith("Bearer "):
         return None
@@ -154,27 +169,46 @@ def is_admin():
     user = get_token_user()
     return user and user.get("role") == "admin"
 
-# ====================== 1. ÓÃ»§Ä£¿é½Ó¿Ú ======================
-# µÇÂ¼
+# ======================é¦–é¡µä»ªè¡¨ç›˜ç»Ÿè®¡æ¥å£======================
+@app.route("/api/dashboard/stats", methods=["GET"])
+def dashboard_stats():
+    conn = sqlite3.connect("book.db")
+    book_total = conn.execute("SELECT COUNT(*) FROM book").fetchone()[0]
+    category_total = conn.execute("SELECT COUNT(*) FROM category").fetchone()[0]
+    borrow_total = conn.execute("SELECT COUNT(*) FROM borrow").fetchone()[0]
+    user_total = conn.execute("SELECT COUNT(*) FROM user").fetchone()[0]
+    conn.close()
+    return jsonify({
+        "code": 200,
+        "data": {
+            "book_total": book_total,
+            "category_total": category_total,
+            "borrow_total": borrow_total,
+            "user_total": user_total
+        }
+    })
+
+# ====================== 1. ç”¨æˆ·æ¨¡å—æ¥å£ ======================
+# ç™»å½•
 @app.route("/api/login", methods=["POST"])
 def login():
     data = request.get_json()
     if not data.get("username") or not data.get("pwd"):
-        return jsonify({"code":400,"msg":"ÕËºÅÃÜÂë²»ÄÜÎª¿Õ"})
+        return jsonify({"code":400,"msg":"è´¦å·å¯†ç ä¸èƒ½ä¸ºç©º"})
     conn = sqlite3.connect("book.db")
     user = conn.execute("SELECT id,username,role,status FROM user WHERE username=? AND pwd=?",
                         (data["username"], data["pwd"])).fetchone()
     conn.close()
     if not user:
-        return jsonify({"code":401,"msg":"ÕËºÅÃÜÂë´íÎó"})
+        return jsonify({"code":401,"msg":"è´¦å·å¯†ç é”™è¯¯"})
     if user[3] == 0:
-        return jsonify({"code":403,"msg":"ÕËºÅÒÑ·â½û"})
-    # Éú³É7ÌìÓĞĞ§ÆÚtoken
-    payload = {"uid":user[0], "username":user[1], "role":user[2], "exp":datetime.utcnow()+timedelta(days=7)}
+        return jsonify({"code":403,"msg":"è´¦å·å·²å°ç¦"})
+    # ä¿®å¤utcnowè¿‡æœŸè­¦å‘Š
+    payload = {"uid":user[0], "username":user[1], "role":user[2], "exp":datetime.now(UTC)+timedelta(days=7)}
     token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
-    return jsonify({"code":200,"msg":"µÇÂ¼³É¹¦","data":{"token":token,"user":user}})
+    return jsonify({"code":200,"msg":"ç™»å½•æˆåŠŸ","data":{"token":token,"user":user}})
 
-# ×¢²á
+# æ³¨å†Œ
 @app.route("/api/register", methods=["POST"])
 def register():
     data = request.get_json()
@@ -182,35 +216,45 @@ def register():
     pwd = data.get("pwd")
     email = data.get("email","")
     if not username or not pwd:
-        return jsonify({"code":400,"msg":"ÕËºÅÃÜÂë±ØÌî"})
+        return jsonify({"code":400,"msg":"è´¦å·å¯†ç å¿…å¡«"})
     try:
         conn = sqlite3.connect("book.db")
         conn.execute("INSERT INTO user(username,pwd,email,nickname) VALUES (?,?,?,?)",
                      (username, pwd, email, username))
         conn.commit()
         conn.close()
-        return jsonify({"code":200,"msg":"×¢²á³É¹¦"})
+        return jsonify({"code":200,"msg":"æ³¨å†ŒæˆåŠŸ"})
     except sqlite3.IntegrityError:
-        return jsonify({"code":400,"msg":"ÓÃ»§Ãû/ÓÊÏäÒÑ´æÔÚ"})
+        return jsonify({"code":400,"msg":"ç”¨æˆ·å/é‚®ç®±å·²å­˜åœ¨"})
 
-# »ñÈ¡¸öÈËĞÅÏ¢
+# è·å–ä¸ªäººä¿¡æ¯ã€è¿”å›å­—å…¸ï¼Œå‰ç«¯å¯ç›´æ¥ç‚¹å±æ€§å–å€¼ã€‘
 @app.route("/api/user/profile", methods=["GET"])
 def get_profile():
     user = get_token_user()
     if not user:
-        return jsonify({"code":401,"msg":"Î´µÇÂ¼"})
+        return jsonify({"code":401,"msg":"æœªç™»å½•"})
     uid = user["uid"]
     conn = sqlite3.connect("book.db")
-    info = conn.execute("SELECT id,username,nickname,email,avatar,role FROM user WHERE id=?", (uid,)).fetchone()
+    # å­—æ®µé¡ºåºï¼šid,username,nickname,email,avatar,role
+    row = conn.execute("SELECT id,username,nickname,email,avatar,role FROM user WHERE id=?", (uid,)).fetchone()
     conn.close()
-    return jsonify({"code":200,"data":info})
+    # è½¬ä¸ºå­—å…¸
+    data = {
+        "id": row[0],
+        "username": row[1],
+        "nickname": row[2],
+        "email": row[3],
+        "avatar": row[4],
+        "role": row[5]
+    }
+    return jsonify({"code":200,"data":data})
 
-# ĞŞ¸Ä¸öÈËĞÅÏ¢
+# ä¿®æ”¹ä¸ªäººä¿¡æ¯
 @app.route("/api/user/profile", methods=["PUT"])
 def update_profile():
     user = get_token_user()
     if not user:
-        return jsonify({"code":401,"msg":"Î´µÇÂ¼"})
+        return jsonify({"code":401,"msg":"æœªç™»å½•"})
     uid = user["uid"]
     data = request.get_json()
     nickname = data.get("nickname","")
@@ -219,14 +263,14 @@ def update_profile():
     conn.execute("UPDATE user SET nickname=?,email=? WHERE id=?", (nickname, email, uid))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"ĞŞ¸Ä³É¹¦"})
+    return jsonify({"code":200,"msg":"ä¿®æ”¹æˆåŠŸ"})
 
-# ĞŞ¸ÄÃÜÂë
+# ä¿®æ”¹å¯†ç 
 @app.route("/api/user/pwd", methods=["PUT"])
 def change_pwd():
     user = get_token_user()
     if not user:
-        return jsonify({"code":401,"msg":"Î´µÇÂ¼"})
+        return jsonify({"code":401,"msg":"æœªç™»å½•"})
     uid = user["uid"]
     data = request.get_json()
     old_pwd = data.get("old_pwd")
@@ -234,33 +278,34 @@ def change_pwd():
     conn = sqlite3.connect("book.db")
     db_pwd = conn.execute("SELECT pwd FROM user WHERE id=?", (uid,)).fetchone()[0]
     if db_pwd != old_pwd:
-        return jsonify({"code":400,"msg":"Ô­ÃÜÂë´íÎó"})
+        return jsonify({"code":400,"msg":"åŸå¯†ç é”™è¯¯"})
     conn.execute("UPDATE user SET pwd=? WHERE id=?", (new_pwd, uid))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"ÃÜÂëĞŞ¸Ä³É¹¦"})
+    return jsonify({"code":200,"msg":"å¯†ç ä¿®æ”¹æˆåŠŸ"})
 
-# ====================== 2. ¹ÜÀíÔ±-ÓÃ»§¹ÜÀí½Ó¿Ú ======================
-# ÓÃ»§·ÖÒ³²éÑ¯
+# ====================== 2. ç®¡ç†å‘˜-ç”¨æˆ·ç®¡ç†æ¥å£ ======================
+# ç”¨æˆ·åˆ†é¡µæŸ¥è¯¢ï¼ˆä¿®å¤SQLæ³¨å…¥æ¼æ´ï¼‰
 @app.route("/api/admin/user/list", methods=["GET"])
 def admin_user_list():
     if not is_admin():
-        return jsonify({"code":403,"msg":"ÎŞ¹ÜÀíÔ±È¨ÏŞ"})
+        return jsonify({"code":403,"msg":"æ— ç®¡ç†å‘˜æƒé™"})
     page = int(request.args.get("page",1))
     size = int(request.args.get("size",10))
     offset = (page-1)*size
     keyword = request.args.get("keyword","")
+    like_param = f'%{keyword}%'
     conn = sqlite3.connect("book.db")
-    total = conn.execute(f"SELECT COUNT(*) FROM user WHERE username LIKE '%{keyword}%'").fetchone()[0]
-    rows = conn.execute(f"SELECT * FROM user WHERE username LIKE '%{keyword}%' LIMIT ?,?", (offset, size)).fetchall()
+    total = conn.execute("SELECT COUNT(*) FROM user WHERE username LIKE ?", (like_param,)).fetchone()[0]
+    rows = conn.execute("SELECT * FROM user WHERE username LIKE ? LIMIT ?,?", (like_param, offset, size)).fetchall()
     conn.close()
     return jsonify({"code":200,"data":{"list":rows,"total":total,"page":page,"size":size}})
 
-# ĞÂÔöÓÃ»§
+# æ–°å¢ç”¨æˆ·
 @app.route("/api/admin/user/add", methods=["POST"])
 def admin_user_add():
     if not is_admin():
-        return jsonify({"code":403,"msg":"ÎŞ¹ÜÀíÔ±È¨ÏŞ"})
+        return jsonify({"code":403,"msg":"æ— ç®¡ç†å‘˜æƒé™"})
     data = request.get_json()
     try:
         conn = sqlite3.connect("book.db")
@@ -268,44 +313,44 @@ def admin_user_add():
                      (data["username"],data["pwd"],data["nickname"],data["role"],data["status"]))
         conn.commit()
         conn.close()
-        return jsonify({"code":200,"msg":"ĞÂÔöÓÃ»§³É¹¦"})
+        return jsonify({"code":200,"msg":"æ–°å¢ç”¨æˆ·æˆåŠŸ"})
     except:
-        return jsonify({"code":400,"msg":"ÓÃ»§ÃûÖØ¸´"})
+        return jsonify({"code":400,"msg":"ç”¨æˆ·åé‡å¤"})
 
-# ĞŞ¸ÄÓÃ»§
+# ä¿®æ”¹ç”¨æˆ·
 @app.route("/api/admin/user/edit/<int:uid>", methods=["PUT"])
 def admin_user_edit(uid):
     if not is_admin():
-        return jsonify({"code":403,"msg":"ÎŞ¹ÜÀíÔ±È¨ÏŞ"})
+        return jsonify({"code":403,"msg":"æ— ç®¡ç†å‘˜æƒé™"})
     data = request.get_json()
     conn = sqlite3.connect("book.db")
     conn.execute("UPDATE user SET nickname=?,role=?,status=? WHERE id=?",
                  (data["nickname"],data["role"],data["status"],uid))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"ĞŞ¸Ä³É¹¦"})
+    return jsonify({"code":200,"msg":"ä¿®æ”¹æˆåŠŸ"})
 
-# É¾³ı/ÅúÁ¿É¾³ıÓÃ»§
+# åˆ é™¤/æ‰¹é‡åˆ é™¤ç”¨æˆ·
 @app.route("/api/admin/user/del", methods=["DELETE"])
 def admin_user_del():
     if not is_admin():
-        return jsonify({"code":403,"msg":"ÎŞ¹ÜÀíÔ±È¨ÏŞ"})
+        return jsonify({"code":403,"msg":"æ— ç®¡ç†å‘˜æƒé™"})
     ids = request.get_json().get("ids",[])
     conn = sqlite3.connect("book.db")
     for uid in ids:
         conn.execute("DELETE FROM user WHERE id=?", (uid,))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"É¾³ıÍê³É"})
+    return jsonify({"code":200,"msg":"åˆ é™¤å®Œæˆ"})
 
-# ====================== 3. Í¼Êé·ÖÀà½Ó¿Ú ======================
-# »ñÈ¡·ÖÀàÊ÷
+# ====================== 3. å›¾ä¹¦åˆ†ç±»æ¥å£ ======================
+# è·å–åˆ†ç±»æ ‘
 @app.route("/api/category/tree", methods=["GET"])
 def category_tree():
     conn = sqlite3.connect("book.db")
     all_cat = conn.execute("SELECT * FROM category ORDER BY sort").fetchall()
     conn.close()
-    # µİ¹é×é×°Ê÷ĞÎ
+    # é€’å½’ç»„è£…æ ‘å½¢
     tree = []
     def build(pid):
         res = []
@@ -318,7 +363,7 @@ def category_tree():
     tree = build(0)
     return jsonify({"code":200,"data":tree})
 
-# ·ÖÀàCRUD
+# åˆ†ç±»CRUD
 @app.route("/api/category/add", methods=["POST"])
 def cat_add():
     data = request.get_json()
@@ -327,7 +372,7 @@ def cat_add():
                  (data["name"],data["parent_id"],data["sort"]))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"Ìí¼Ó·ÖÀà³É¹¦"})
+    return jsonify({"code":200,"msg":"æ·»åŠ åˆ†ç±»æˆåŠŸ"})
 
 @app.route("/api/category/edit/<int:cid>", methods=["PUT"])
 def cat_edit(cid):
@@ -337,7 +382,7 @@ def cat_edit(cid):
                  (data["name"],data["parent_id"],data["sort"],cid))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"ĞŞ¸Ä·ÖÀà³É¹¦"})
+    return jsonify({"code":200,"msg":"ä¿®æ”¹åˆ†ç±»æˆåŠŸ"})
 
 @app.route("/api/category/del/<int:cid>", methods=["DELETE"])
 def cat_del(cid):
@@ -345,9 +390,9 @@ def cat_del(cid):
     conn.execute("DELETE FROM category WHERE id=?", (cid,))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"É¾³ı·ÖÀà³É¹¦"})
+    return jsonify({"code":200,"msg":"åˆ é™¤åˆ†ç±»æˆåŠŸ"})
 
-# ·ÖÀàÍ¼ÊéÍ³¼Æ
+# åˆ†ç±»å›¾ä¹¦ç»Ÿè®¡
 @app.route("/api/category/count", methods=["GET"])
 def cat_count():
     conn = sqlite3.connect("book.db")
@@ -359,8 +404,8 @@ def cat_count():
     conn.close()
     return jsonify({"code":200,"data":res})
 
-# ====================== 4. Í¼Êé¹ÜÀí½Ó¿Ú ======================
-# Í¼Êé·ÖÒ³ÁĞ±í
+# ====================== 4. å›¾ä¹¦ç®¡ç†æ¥å£ ======================
+# å›¾ä¹¦åˆ†é¡µåˆ—è¡¨
 @app.route("/api/book/list", methods=["GET"])
 def book_list():
     page = int(request.args.get("page",1))
@@ -370,20 +415,23 @@ def book_list():
     offset = (page-1)*size
     conn = sqlite3.connect("book.db")
     where = ""
+    params = []
     if cid:
-        where = f"WHERE category_id={cid}"
+        where = "WHERE category_id=?"
+        params.append(cid)
     order = "id DESC"
     if sort == "hot": order = "borrow_count DESC"
     if sort == "new": order = "publish_time DESC"
     if sort == "score": order = "score DESC"
     if sort == "collect": order = "collect_count DESC"
-    total = conn.execute(f"SELECT COUNT(*) FROM book {where}").fetchone()[0]
+    total = conn.execute(f"SELECT COUNT(*) FROM book {where}", params).fetchone()[0]
+    params.extend([offset, size])
     sql = f"SELECT * FROM book {where} ORDER BY {order} LIMIT ?,?"
-    list_data = conn.execute(sql, (offset, size)).fetchall()
+    list_data = conn.execute(sql, params).fetchall()
     conn.close()
     return jsonify({"code":200,"data":{"list":list_data,"total":total}})
 
-# µ¥±¾Í¼ÊéÏêÇé
+# å•æœ¬å›¾ä¹¦è¯¦æƒ…
 @app.route("/api/book/<int:bid>", methods=["GET"])
 def book_detail(bid):
     conn = sqlite3.connect("book.db")
@@ -391,49 +439,50 @@ def book_detail(bid):
     conn.close()
     return jsonify({"code":200,"data":book})
 
-# ¹ÜÀíÔ±Í¼ÊéĞÂÔö/±à¼­/É¾³ı
+# ç®¡ç†å‘˜å›¾ä¹¦æ–°å¢/ç¼–è¾‘/åˆ é™¤
 @app.route("/api/admin/book/add", methods=["POST"])
 def book_add():
-    if not is_admin(): return jsonify({"code":403,"msg":"ÎŞÈ¨ÏŞ"})
+    if not is_admin(): return jsonify({"code":403,"msg":"æ— æƒé™"})
     data = request.get_json()
     conn = sqlite3.connect("book.db")
     conn.execute('''
     INSERT INTO book(name,author,category_id,publisher,stock,cover_url,desc,publish_time)
     VALUES (?,?,?,?,?,?,?,?)
     ''', (data["name"],data["author"],data["category_id"],data["publisher"],
-          data["stock"],data["cover_url"],data["desc"],data["publish_time"]))
+          data["stock"],data["cover_url"],data["desc"],data["publishing_time"]))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"ĞÂÔöÍ¼Êé³É¹¦"})
+    return jsonify({"code":200,"msg":"æ–°å¢å›¾ä¹¦æˆåŠŸ"})
 
+# è¿™é‡Œä¿®æ­£äº†ä¹‹å‰å†™é”™çš„publish_timeå­—æ®µ
 @app.route("/api/admin/book/edit/<int:bid>", methods=["PUT"])
 def book_edit(bid):
-    if not is_admin(): return jsonify({"code":403,"msg":"ÎŞÈ¨ÏŞ"})
+    if not is_admin(): return jsonify({"code":403,"msg":"æ— æƒé™"})
     data = request.get_json()
     conn = sqlite3.connect("book.db")
     conn.execute('''
     UPDATE book SET name=?,author=?,category_id=?,publisher=?,stock=?,cover_url=?,desc=?,publish_time=?,status=?
     WHERE id=?
     ''', (data["name"],data["author"],data["category_id"],data["publisher"],
-          data["stock"],data["cover_url"],data["desc"],data["publish_time"],data["status"],bid))
+          data["stock"],data["cover_url"],data["desc"],data["publishing_time"],data["status"],bid))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"ĞŞ¸ÄÍ¼Êé³É¹¦"})
+    return jsonify({"code":200,"msg":"ä¿®æ”¹å›¾ä¹¦æˆåŠŸ"})
 
 @app.route("/api/admin/book/del/<int:bid>", methods=["DELETE"])
 def book_del(bid):
-    if not is_admin(): return jsonify({"code":403,"msg":"ÎŞÈ¨ÏŞ"})
+    if not is_admin(): return jsonify({"code":403,"msg":"æ— æƒé™"})
     conn = sqlite3.connect("book.db")
     conn.execute("DELETE FROM book WHERE id=?", (bid,))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"É¾³ıÍ¼Êé³É¹¦"})
+    return jsonify({"code":200,"msg":"åˆ é™¤å›¾ä¹¦æˆåŠŸ"})
 
-# ====================== 5. ÊÕ²ØÄ£¿é½Ó¿Ú ======================
+# ====================== 5. æ”¶è—æ¨¡å—æ¥å£ ======================
 @app.route("/api/collect/add/<int:bid>", methods=["POST"])
 def collect_add(bid):
     user = get_token_user()
-    if not user: return jsonify({"code":401,"msg":"Î´µÇÂ¼"})
+    if not user: return jsonify({"code":401,"msg":"æœªç™»å½•"})
     uid = user["uid"]
     try:
         conn = sqlite3.connect("book.db")
@@ -441,23 +490,28 @@ def collect_add(bid):
         conn.execute("UPDATE book SET collect_count=collect_count+1 WHERE id=?", (bid,))
         conn.commit()
         conn.close()
-        return jsonify({"code":200,"msg":"ÊÕ²Ø³É¹¦"})
+        return jsonify({"code":200,"msg":"æ”¶è—æˆåŠŸ"})
     except:
-        return jsonify({"code":400,"msg":"ÒÑÊÕ²Ø"})
+        return jsonify({"code":400,"msg":"å·²æ”¶è—"})
 
 @app.route("/api/collect/cancel/<int:bid>", methods=["DELETE"])
 def collect_cancel(bid):
     user = get_token_user()
-    if not user: return jsonify({"code":401,"msg":"Î´µÇÂ¼"})
+    if not user: return jsonify({"code":401,"msg":"æœªç™»å½•"})
     uid = user["uid"]
     conn = sqlite3.connect("book.db")
     conn.execute("DELETE FROM collection WHERE user_id=? AND book_id=?", (uid,bid))
     conn.execute("UPDATE book SET collect_count=collect_count-1 WHERE id=?", (bid,))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"È¡ÏûÊÕ²Ø"})
+    return jsonify({"code":200,"msg":"å–æ¶ˆæ”¶è—"})
 
-# ²éÑ¯ÊÇ·ñÊÕ²Ø
+# å…¼å®¹å‰ç«¯ /api/collect/del/{bid} è·¯å¾„ï¼Œè§£å†³å‰ç«¯404æŠ¥é”™
+@app.route("/api/collect/del/<int:bid>", methods=["DELETE"])
+def collect_del_alias(bid):
+    return collect_cancel(bid)
+
+# æŸ¥è¯¢æ˜¯å¦æ”¶è—
 @app.route("/api/collect/check/<int:bid>", methods=["GET"])
 def collect_check(bid):
     user = get_token_user()
@@ -468,11 +522,11 @@ def collect_check(bid):
     conn.close()
     return jsonify({"code":200,"data": bool(res)})
 
-# ÎÒµÄÊÕ²ØÁĞ±í
+# æˆ‘çš„æ”¶è—åˆ—è¡¨
 @app.route("/api/collect/my", methods=["GET"])
 def my_collect():
     user = get_token_user()
-    if not user: return jsonify({"code":401,"msg":"Î´µÇÂ¼"})
+    if not user: return jsonify({"code":401,"msg":"æœªç™»å½•"})
     uid = user["uid"]
     conn = sqlite3.connect("book.db")
     list_data = conn.execute('''
@@ -481,36 +535,36 @@ def my_collect():
     conn.close()
     return jsonify({"code":200,"data":list_data})
 
-# ====================== 6. ½èÔÄÄ£¿é½Ó¿Ú ======================
-# ÓÃ»§·¢Æğ½èÔÄÉêÇë
+# ====================== 6. å€Ÿé˜…æ¨¡å—æ¥å£ ======================
+# ç”¨æˆ·å‘èµ·å€Ÿé˜…ç”³è¯·
 @app.route("/api/borrow/apply/<int:bid>", methods=["POST"])
 def borrow_apply(bid):
     user = get_token_user()
-    if not user: return jsonify({"code":401,"msg":"Î´µÇÂ¼"})
+    if not user: return jsonify({"code":401,"msg":"æœªç™»å½•"})
     uid = user["uid"]
     data = request.get_json()
     days = data.get("days",14)
     today = datetime.now().strftime("%Y-%m-%d")
     due = (datetime.now()+timedelta(days=days)).strftime("%Y-%m-%d")
     conn = sqlite3.connect("book.db")
-    # ÅĞ¶Ï¿â´æ
+    # åˆ¤æ–­åº“å­˜
     stock = conn.execute("SELECT stock FROM book WHERE id=?", (bid,)).fetchone()[0]
     if stock <=0:
-        return jsonify({"code":400,"msg":"¿â´æ²»×ã"})
+        return jsonify({"code":400,"msg":"åº“å­˜ä¸è¶³"})
     conn.execute('''
     INSERT INTO borrow(user_id,book_id,borrow_days,due_date,start_date)
     VALUES (?,?,?,?,?)
     ''', (uid,bid,days,due,today))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"½èÔÄÉêÇëÌá½»£¬µÈ´ı¹ÜÀíÔ±ÉóºË"})
+    return jsonify({"code":200,"msg":"å€Ÿé˜…ç”³è¯·æäº¤ï¼Œç­‰å¾…ç®¡ç†å‘˜å®¡æ ¸"})
 
-# ¹ÜÀíÔ±ÉóÅú/²µ»Ø
+# ç®¡ç†å‘˜å®¡æ‰¹/é©³å›
 @app.route("/api/admin/borrow/audit/<int:borrow_id>", methods=["PUT"])
 def borrow_audit(borrow_id):
-    if not is_admin(): return jsonify({"code":403,"msg":"ÎŞÈ¨ÏŞ"})
+    if not is_admin(): return jsonify({"code":403,"msg":"æ— æƒé™"})
     data = request.get_json()
-    status = data["status"] # 1Í¨¹ı 2²µ»Ø
+    status = data["status"] # 1é€šè¿‡ 2é©³å›
     conn = sqlite3.connect("book.db")
     borrow_info = conn.execute("SELECT book_id FROM borrow WHERE id=?", (borrow_id,)).fetchone()
     bid = borrow_info[0]
@@ -519,47 +573,47 @@ def borrow_audit(borrow_id):
     conn.execute("UPDATE borrow SET status=? WHERE id=?", (status, borrow_id))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"ÉóÅúÍê³É"})
+    return jsonify({"code":200,"msg":"å®¡æ‰¹å®Œæˆ"})
 
-# ÓÃ»§¹é»¹Í¼Êé
+# ç”¨æˆ·å½’è¿˜å›¾ä¹¦
 @app.route("/api/borrow/return/<int:borrow_id>", methods=["PUT"])
 def borrow_return(borrow_id):
     user = get_token_user()
-    if not user: return jsonify({"code":401,"msg":"Î´µÇÂ¼"})
+    if not user: return jsonify({"code":401,"msg":"æœªç™»å½•"})
     uid = user["uid"]
     conn = sqlite3.connect("book.db")
     borrow = conn.execute("SELECT book_id,status FROM borrow WHERE id=? AND user_id=?", (borrow_id,uid)).fetchone()
     if not borrow or borrow[1] !=1:
-        return jsonify({"code":400,"msg":"ÎŞ·¨¹é»¹"})
+        return jsonify({"code":400,"msg":"æ— æ³•å½’è¿˜"})
     bid = borrow[0]
     conn.execute("UPDATE borrow SET return_date=CURRENT_DATE,status=3 WHERE id=?", (borrow_id,))
     conn.execute("UPDATE book SET stock=stock+1 WHERE id=?", (bid,))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"¹é»¹³É¹¦"})
+    return jsonify({"code":200,"msg":"å½’è¿˜æˆåŠŸ"})
 
-# Ğø½è
+# ç»­å€Ÿ
 @app.route("/api/borrow/renew/<int:borrow_id>", methods=["PUT"])
 def borrow_renew(borrow_id):
     user = get_token_user()
-    if not user: return jsonify({"code":401,"msg":"Î´µÇÂ¼"})
+    if not user: return jsonify({"code":401,"msg":"æœªç™»å½•"})
     uid = user["uid"]
     conn = sqlite3.connect("book.db")
     borrow = conn.execute("SELECT due_date,borrow_days,status FROM borrow WHERE id=? AND user_id=?", (borrow_id,uid)).fetchone()
     if not borrow or borrow[2] !=1:
-        return jsonify({"code":400,"msg":"²»¿ÉĞø½è"})
+        return jsonify({"code":400,"msg":"ä¸å¯ç»­å€Ÿ"})
     old_due = datetime.strptime(borrow[0], "%Y-%m-%d")
     new_due = old_due + timedelta(days=borrow[1])
     conn.execute("UPDATE borrow SET due_date=? WHERE id=?", (new_due.strftime("%Y-%m-%d"), borrow_id))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"Ğø½è³É¹¦"})
+    return jsonify({"code":200,"msg":"ç»­å€ŸæˆåŠŸ"})
 
-# ÎÒµÄ½èÔÄ¼ÇÂ¼
+# æˆ‘çš„å€Ÿé˜…è®°å½•
 @app.route("/api/borrow/my", methods=["GET"])
 def my_borrow():
     user = get_token_user()
-    if not user: return jsonify({"code":401,"msg":"Î´µÇÂ¼"})
+    if not user: return jsonify({"code":401,"msg":"æœªç™»å½•"})
     uid = user["uid"]
     conn = sqlite3.connect("book.db")
     list_data = conn.execute('''
@@ -568,10 +622,10 @@ def my_borrow():
     conn.close()
     return jsonify({"code":200,"data":list_data})
 
-# ¹ÜÀíÔ±½èÔÄÁĞ±í£¨É¸Ñ¡ÓâÆÚ/¼´½«µ½ÆÚ£©
+# ç®¡ç†å‘˜å€Ÿé˜…åˆ—è¡¨ï¼ˆç­›é€‰é€¾æœŸ/å³å°†åˆ°æœŸï¼‰
 @app.route("/api/admin/borrow/list", methods=["GET"])
 def admin_borrow_list():
-    if not is_admin(): return jsonify({"code":403,"msg":"ÎŞÈ¨ÏŞ"})
+    if not is_admin(): return jsonify({"code":403,"msg":"æ— æƒé™"})
     filter_type = request.args.get("filter","all")
     today = datetime.now().strftime("%Y-%m-%d")
     conn = sqlite3.connect("book.db")
@@ -589,12 +643,12 @@ def admin_borrow_list():
     conn.close()
     return jsonify({"code":200,"data":res})
 
-# ====================== 7. ÆÀÂÛÄ£¿é½Ó¿Ú ======================
-# ·¢±íÆÀÂÛ
+# ====================== 7. è¯„è®ºæ¨¡å—æ¥å£ ======================
+# å‘è¡¨è¯„è®º
 @app.route("/api/comment/add/<int:bid>", methods=["POST"])
 def comment_add(bid):
     user = get_token_user()
-    if not user: return jsonify({"code":401,"msg":"Î´µÇÂ¼"})
+    if not user: return jsonify({"code":401,"msg":"æœªç™»å½•"})
     uid = user["uid"]
     data = request.get_json()
     content = data["content"]
@@ -602,36 +656,37 @@ def comment_add(bid):
     conn = sqlite3.connect("book.db")
     conn.execute("INSERT INTO comment(user_id,book_id,content,score) VALUES (?,?,?,?)",
                  (uid,bid,content,score))
-    # ¸üĞÂÍ¼ÊéÆ½¾ù·Ö
+    # æ›´æ–°å›¾ä¹¦å¹³å‡åˆ†
     all_score = conn.execute("SELECT AVG(score) FROM comment WHERE book_id=?", (bid,)).fetchone()[0]
-    conn.execute("UPDATE book SET score=? WHERE id=?", (round(all_score,1), bid))
+    if all_score is not None:
+        conn.execute("UPDATE book SET score=? WHERE id=?", (round(all_score,1), bid))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"ÆÀÂÛ·¢²¼³É¹¦"})
+    return jsonify({"code":200,"msg":"è¯„è®ºå‘å¸ƒæˆåŠŸ"})
 
-# É¾³ı±¾ÈËÆÀÂÛ
+# åˆ é™¤æœ¬äººè¯„è®º
 @app.route("/api/comment/del/<int:cid>", methods=["DELETE"])
 def comment_del(cid):
     user = get_token_user()
-    if not user: return jsonify({"code":401,"msg":"Î´µÇÂ¼"})
+    if not user: return jsonify({"code":401,"msg":"æœªç™»å½•"})
     uid = user["uid"]
     conn = sqlite3.connect("book.db")
     conn.execute("DELETE FROM comment WHERE id=? AND user_id=?", (cid,uid))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"É¾³ıÆÀÂÛ³É¹¦"})
+    return jsonify({"code":200,"msg":"åˆ é™¤è¯„è®ºæˆåŠŸ"})
 
-# ¹ÜÀíÔ±É¾³ıÆÀÂÛ
+# ç®¡ç†å‘˜åˆ é™¤è¯„è®º
 @app.route("/api/admin/comment/del/<int:cid>", methods=["DELETE"])
 def admin_comment_del(cid):
-    if not is_admin(): return jsonify({"code":403,"msg":"ÎŞÈ¨ÏŞ"})
+    if not is_admin(): return jsonify({"code":403,"msg":"æ— æƒé™"})
     conn = sqlite3.connect("book.db")
     conn.execute("DELETE FROM comment WHERE id=?", (cid,))
     conn.commit()
     conn.close()
-    return jsonify({"code":200,"msg":"¹ÜÀíÔ±É¾³ıÆÀÂÛ³É¹¦"})
+    return jsonify({"code":200,"msg":"ç®¡ç†å‘˜åˆ é™¤è¯„è®ºæˆåŠŸ"})
 
-# Í¼ÊéÆÀÂÛÁĞ±í
+# å›¾ä¹¦è¯„è®ºåˆ—è¡¨
 @app.route("/api/book/comment/<int:bid>", methods=["GET"])
 def book_comment(bid):
     conn = sqlite3.connect("book.db")
@@ -642,10 +697,10 @@ def book_comment(bid):
     conn.close()
     return jsonify({"code":200,"data":res})
 
-# ¹ÜÀíÔ±È«²¿ÆÀÂÛ
+# ç®¡ç†å‘˜å…¨éƒ¨è¯„è®º
 @app.route("/api/admin/comment/list", methods=["GET"])
 def admin_comment_list():
-    if not is_admin(): return jsonify({"code":403,"msg":"ÎŞÈ¨ÏŞ"})
+    if not is_admin(): return jsonify({"code":403,"msg":"æ— æƒé™"})
     conn = sqlite3.connect("book.db")
     res = conn.execute('''
     SELECT c.*,u.username,b.name FROM comment c
@@ -656,8 +711,8 @@ def admin_comment_list():
     conn.close()
     return jsonify({"code":200,"data":res})
 
-# ====================== 8. Æß´óÍÆ¼ö½Ó¿Ú ======================
-# 1.ÈÈÃÅÍ¼ÊéÍÆ¼ö
+# ====================== 8. ä¸ƒå¤§æ¨èæ¥å£ ======================
+# 1.çƒ­é—¨å›¾ä¹¦æ¨è
 @app.route("/api/recommend/hot", methods=["GET"])
 def rec_hot():
     conn = sqlite3.connect("book.db")
@@ -665,7 +720,7 @@ def rec_hot():
     conn.close()
     return jsonify({"code":200,"data":res})
 
-# 2.ĞÂÊéÍÆ¼ö
+# 2.æ–°ä¹¦æ¨è
 @app.route("/api/recommend/new", methods=["GET"])
 def rec_new():
     conn = sqlite3.connect("book.db")
@@ -673,7 +728,7 @@ def rec_new():
     conn.close()
     return jsonify({"code":200,"data":res})
 
-# 3.ÎïÆ·Ğ­Í¬¹ıÂË ItemCF£¨Í¬·ÖÀàÍ¬½èÔÄ£©
+# 3.ç‰©å“ååŒè¿‡æ»¤ ItemCFï¼ˆåŒåˆ†ç±»åŒå€Ÿé˜…ï¼‰
 @app.route("/api/recommend/itemcf/<int:bid>", methods=["GET"])
 def rec_itemcf(bid):
     conn = sqlite3.connect("book.db")
@@ -682,46 +737,54 @@ def rec_itemcf(bid):
     conn.close()
     return jsonify({"code":200,"data":res})
 
-# 4.ÓÃ»§Ğ­Í¬¹ıÂË UserCF£¨Í¬ÓÃ»§½èÔÄ¼ÇÂ¼£©
+# 4.ç”¨æˆ·ååŒè¿‡æ»¤ UserCFï¼ˆåŒç”¨æˆ·å€Ÿé˜…è®°å½•ï¼‰
 @app.route("/api/recommend/usercf", methods=["GET"])
 def rec_usercf():
     user = get_token_user()
     if not user: return jsonify({"code":200,"data":[]})
     uid = user["uid"]
     conn = sqlite3.connect("book.db")
-    my_book_ids = [i[0] for i in conn.execute("SELECT DISTINCT book_id FROM borrow WHERE user_id=?", (uid,)).fetchall()]
+    my_book_rows = conn.execute("SELECT DISTINCT book_id FROM borrow WHERE user_id=?", (uid,)).fetchall()
+    my_book_ids = [row[0] for row in my_book_rows]
     if not my_book_ids:
         return jsonify({"code":200,"data":[]})
-    # ÕÒ½èÔÄ¹ıÏàÍ¬ÊéµÄÆäËûÓÃ»§
-    other_uids = [i[0] for i in conn.execute(f"SELECT DISTINCT user_id FROM borrow WHERE book_id IN ({','.join(map(str,my_book_ids))}) AND user_id!={uid}").fetchall()]
+    # å‚æ•°åŒ–æŸ¥è¯¢ï¼Œé¿å…SQLæ³¨å…¥
+    placeholders = ",".join(["?"] * len(my_book_ids))
+    other_uid_rows = conn.execute(f"SELECT DISTINCT user_id FROM borrow WHERE book_id IN ({placeholders}) AND user_id != ?", (*my_book_ids, uid)).fetchall()
+    other_uids = [row[0] for row in other_uid_rows]
     if not other_uids:
+        conn.close()
         return jsonify({"code":200,"data":[]})
+    uid_placeholders = ",".join(["?"] * len(other_uids))
+    bid_placeholders = ",".join(["?"] * len(my_book_ids))
     rec_book = conn.execute(f'''
     SELECT DISTINCT b.* FROM borrow br LEFT JOIN book b ON br.book_id=b.id
-    WHERE br.user_id IN ({','.join(map(str,other_uids))}) AND br.book_id NOT IN ({','.join(map(str,my_book_ids))})
+    WHERE br.user_id IN ({uid_placeholders}) AND br.book_id NOT IN ({bid_placeholders})
     LIMIT 6
-    ''').fetchall()
+    ''', (*other_uids, *my_book_ids)).fetchall()
     conn.close()
     return jsonify({"code":200,"data":rec_book})
 
-# 5.ÄÚÈİÍÆ¼ö£¨·ÖÀàÆ¥Åä£©
+# 5.å†…å®¹æ¨èï¼ˆåˆ†ç±»åŒ¹é…ï¼‰
 @app.route("/api/recommend/content", methods=["GET"])
 def rec_content():
     user = get_token_user()
     if not user: return jsonify({"code":200,"data":[]})
     uid = user["uid"]
     conn = sqlite3.connect("book.db")
-    my_cat = conn.execute('''
+    my_cat_rows = conn.execute('''
     SELECT DISTINCT b.category_id FROM borrow br LEFT JOIN book b ON br.book_id=b.id WHERE br.user_id=?
     ''', (uid,)).fetchall()
-    if not my_cat:
+    if not my_cat_rows:
+        conn.close()
         return jsonify({"code":200,"data":[]})
-    cat_list = ",".join([str(i[0]) for i in my_cat])
-    res = conn.execute(f"SELECT * FROM book WHERE category_id IN ({cat_list}) ORDER BY score DESC LIMIT 6").fetchall()
+    my_cat_ids = [row[0] for row in my_cat_rows]
+    cat_placeholders = ",".join(["?"] * len(my_cat_ids))
+    res = conn.execute(f"SELECT * FROM book WHERE category_id IN ({cat_placeholders}) ORDER BY score DESC LIMIT 6", my_cat_ids).fetchall()
     conn.close()
     return jsonify({"code":200,"data":res})
 
-# 6.ÏàËÆÍ¼ÊéÍÆ¼ö£¨Í¬·ÖÀà£©
+# 6.ç›¸ä¼¼å›¾ä¹¦æ¨èï¼ˆåŒåˆ†ç±»ï¼‰
 @app.route("/api/recommend/similar/<int:bid>", methods=["GET"])
 def rec_similar(bid):
     conn = sqlite3.connect("book.db")
@@ -730,7 +793,7 @@ def rec_similar(bid):
     conn.close()
     return jsonify({"code":200,"data":res})
 
-# 7.»ìºÏÍÆ¼ö£¨ºÏ²¢ÈÈÃÅ+ÄÚÈİÍÆ¼ö£©
+# 7.æ··åˆæ¨èï¼ˆåˆå¹¶çƒ­é—¨+å†…å®¹æ¨èï¼‰
 @app.route("/api/recommend/mix", methods=["GET"])
 def rec_mix():
     user = get_token_user()
@@ -738,14 +801,19 @@ def rec_mix():
     conn = sqlite3.connect("book.db")
     hot = conn.execute("SELECT * FROM book ORDER BY borrow_count DESC LIMIT 4").fetchall()
     content = []
-    if uid:
-        my_cat = conn.execute('''
+    if uid is not None:
+        my_cat_rows = conn.execute('''
         SELECT DISTINCT b.category_id FROM borrow br LEFT JOIN book b ON br.book_id=b.id WHERE br.user_id=?
         ''', (uid,)).fetchall()
-        if my_cat:
-            cat_list = ",".join([str(i[0]) for i in my_cat])
-            content = conn.execute(f"SELECT * FROM book WHERE category_id IN ({cat_list}) LIMIT 4").fetchall()
-    mix = list({item[0]:item for item in hot+content}.values())[:8]
+        if my_cat_rows:
+            my_cat_ids = [row[0] for row in my_cat_rows]
+            cat_placeholders = ",".join(["?"] * len(my_cat_ids))
+            content = conn.execute(f"SELECT * FROM book WHERE category_id IN ({cat_placeholders}) LIMIT 4", my_cat_ids).fetchall()
+    # å»é‡åˆå¹¶
+    mix_map = {}
+    for item in hot + content:
+        mix_map[item[0]] = item
+    mix = list(mix_map.values())[:8]
     conn.close()
     return jsonify({"code":200,"data":mix})
 

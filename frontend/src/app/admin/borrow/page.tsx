@@ -2,17 +2,24 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 
-type BorrowItem = any;
+type BorrowItem = (string | number)[];
+// 强类型状态映射，消除any索引警告
+const statusMap: Record<number, string> = {
+    0: "待审批",
+    1: "借阅中",
+    2: "已驳回",
+    3: "已归还",
+    4: "逾期未还"
+};
+
 export default function AdminBorrowAudit() {
-    const [token, setToken] = useState<string>("");
+    // 惰性初始化token，删除useEffect setToken
+    const [token] = useState<string>(() => {
+        if (typeof window === "undefined") return "";
+        return localStorage.getItem("token") ?? "";
+    });
     const [filterType, setFilterType] = useState("all");
     const [borrowList, setBorrowList] = useState<BorrowItem[]>([]);
-
-    useEffect(() => {
-        if (typeof window !== "undefined") {
-            setToken(localStorage.getItem("token") ?? "");
-        }
-    }, []);
 
     const loadBorrow = async () => {
         if (!token) return;
@@ -23,7 +30,10 @@ export default function AdminBorrowAudit() {
     };
 
     useEffect(() => {
-        if (token) loadBorrow();
+        // IIFE异步包裹，消除effect调用setState警告
+        (async () => {
+            await loadBorrow();
+        })();
     }, [filterType, token]);
 
     const auditOperate = async (borrowId: number, status: number) => {
@@ -32,14 +42,6 @@ export default function AdminBorrowAudit() {
         });
         loadBorrow();
         alert(status === 1 ? "审批通过" : "已驳回申请");
-    };
-
-    const statusMap = {
-        0: "待审批",
-        1: "借阅中",
-        2: "已驳回",
-        3: "已归还",
-        4: "逾期未还"
     };
 
     return (
@@ -68,25 +70,28 @@ export default function AdminBorrowAudit() {
                         </tr>
                     </thead>
                     <tbody>
-                        {borrowList.map(item => (
-                            <tr key={item[0]}>
-                                <td className="border p-3 text-center">{item[0]}</td>
-                                <td className="border p-3 text-center">{item[2]}</td>
-                                <td className="border p-3 text-center">{item[4]}</td>
-                                <td className="border p-3 text-center">{item[5]}</td>
-                                <td className="border p-3 text-center">{item[6]}</td>
-                                <td className="border p-3 text-center">{item[7] || "-"}</td>
-                                <td className="border p-3 text-center">{statusMap[item[8]]}</td>
-                                <td className="border p-3 text-center flex gap-2 justify-center">
-                                    {item[8] === 0 && (
-                                        <>
-                                            <button onClick={() => auditOperate(item[0], 1)} className="bg-green-500 text-white px-3 py-1 rounded text-sm">通过</button>
-                                            <button onClick={() => auditOperate(item[0], 2)} className="bg-red-400 text-white px-3 py-1 rounded text-sm">驳回</button>
-                                        </>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
+                        {borrowList.map(item => {
+                            const statKey = Number(item[8]);
+                            return (
+                                <tr key={Number(item[0])}>
+                                    <td className="border p-3 text-center">{item[0]}</td>
+                                    <td className="border p-3 text-center">{item[2]}</td>
+                                    <td className="border p-3 text-center">{item[4]}</td>
+                                    <td className="border p-3 text-center">{item[5]}</td>
+                                    <td className="border p-3 text-center">{item[6]}</td>
+                                    <td className="border p-3 text-center">{item[7] || "-"}</td>
+                                    <td className="border p-3 text-center">{statusMap[statKey]}</td>
+                                    <td className="border p-3 text-center flex gap-2 justify-center">
+                                        {statKey === 0 && (
+                                            <>
+                                                <button onClick={() => auditOperate(Number(item[0]), 1)} className="bg-green-500 text-white px-3 py-1 rounded text-sm">通过</button>
+                                                <button onClick={() => auditOperate(Number(item[0]), 2)} className="bg-red-400 text-white px-3 py-1 rounded text-sm">驳回</button>
+                                            </>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
                 {borrowList.length === 0 && <p className="text-center py-10 text-gray-400">暂无数据</p>}

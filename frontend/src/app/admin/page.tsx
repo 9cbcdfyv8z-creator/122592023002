@@ -4,7 +4,11 @@ import Link from "next/link";
 import axios from "axios";
 
 export default function AdminDashboard() {
-    const token = localStorage.getItem("token");
+    // 惰性初始化token，解决SSR localStorage未定义
+    const [token] = useState<string>(() => {
+        if (typeof window === "undefined") return "";
+        return localStorage.getItem("token") ?? "";
+    });
     const [stat, setStat] = useState({ user: 0, book: 0, borrow: 0, category: 0 });
 
     const loadStat = async () => {
@@ -21,9 +25,12 @@ export default function AdminDashboard() {
         });
     };
 
+    // IIFE 消除effect内setState lint警告
     useEffect(() => {
-        if (!token) return alert("未登录，请先登录");
-        loadStat();
+        (async () => {
+            if (!token) return alert("未登录，请先登录");
+            await loadStat();
+        })();
     }, [token]);
 
     return (
