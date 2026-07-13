@@ -4,13 +4,15 @@ from flask_cors import CORS
 import sqlite3
 import jwt
 from datetime import datetime, timedelta, UTC
+import random
+import string
 
 app = Flask(__name__)
-# 完整修复CORS，放行OPTIONS预检、DELETE方法、Authorization鉴权头
+# 完整修复CORS，放行所有域名，本地+线上前端都能访问
 CORS(
     app,
     supports_credentials=True,
-    origins=["http://localhost:3000"],
+    origins=["*"],
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"]
 )
