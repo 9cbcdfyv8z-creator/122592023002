@@ -10,28 +10,24 @@
 > 修正说明：文档初始误写MySQL/SQLAlchemy，本项目使用原生SQLite无ORM框架。
 
 ## 完整项目目录
-
-## 完整项目目录
 122592023002/
-├─ backend/               # Flask后端核心代码
-│  ├─ app.py              # 所有接口、数据库初始化、跨域配置、注册/评论接口修复
-│  ├─ requirements.txt    # Python依赖清单
-│  └─ book.db             # SQLite数据库
+├─ backend/               # Flask后端接口、数据库初始化脚本
+│  ├─ app.py              # 全部业务接口、跨域配置、数据表创建
+│  ├─ book.db             # SQLite数据库文件
+│  └─ requirements.txt    # Python依赖清单
 ├─ frontend/              # Next.js前端项目
 │  ├─ src/app/            # 所有页面路由文件
-│  └─ package.json        # 前端依赖
-├─ docs/                  # 实训全部佐证素材文件夹
-│  ├─ api_screenshot/     # Postman接口请求+返回截图存放
-│  ├─ code_review/        # AI代码评审文档截图
-│  ├─ demo_video/         # 项目完整操作演示视频
-│  └─ prompt_screenshot/  # 和AI对话聊天截图
-├─ prompt_log.md          # 标准化AI开发全过程日志
-├─ api_doc.md             # 后端完整接口文档
-├─ code_review.md         # AI代码评审报告
-├─ README.md              # 项目总说明文档
-├─ 个人实训总结.md        # 不少于500字实训复盘报告
-└─ .gitignore             # Git忽略配置文件
-
+│  └─ package.json        # 前端依赖配置
+├─ docs/                  # 实训考核配套素材文件夹
+│  ├─ api_screenshot/     # Postman接口测试截图
+│  ├─ code_review/        # AI代码评审截图
+│  ├─ demo_video/         # 项目完整操作演示录屏
+│  └─ prompt_screenshot/  # AI问答对话截图
+├─ prompt_log.md          # 全流程AI辅助开发文字日志
+├─ api_doc.md             # 后端完整REST接口文档
+├─ code_review.md         # AI全项目代码评审报告
+├─ README.md              # 项目说明文档
+└─ 个人实训总结.md        # 实训复盘报告
 
 ## 功能列表
 ### 用户前台功能
