@@ -1,0 +1,2 @@
+name = "book-front"
+pages_build_output_dir = ".next"
