@@ -3,9 +3,12 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import sqlite3
 import jwt
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta
 import random
 import string
+
+# 兼容Python3.10 无datetime.UTC问题
+UTC = datetime.utcnow().tzinfo
 
 app = Flask(__name__)
 # 完整修复CORS，放行所有域名，本地+线上前端都能访问
@@ -202,7 +205,7 @@ def login():
         return jsonify({"code":401,"msg":"账号密码错误"})
     if user[3] == 0:
         return jsonify({"code":403,"msg":"账号已封禁"})
-    payload = {"uid":user[0], "username":user[1], "role":user[2], "exp":datetime.now(UTC)+timedelta(days=7)}
+    payload = {"uid":user[0], "username":user[1], "role":user[2], "exp":datetime.utcnow()+timedelta(days=7)}
     token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
     return jsonify({"code":200,"msg":"登录成功","data":{"token":token,"user":user}})
 
