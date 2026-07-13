@@ -15,7 +15,8 @@ app = Flask(__name__)
 CORS(
     app,
     supports_credentials=True,
-    origins=["*"],
+    origins=["http://localhost:3000",
+        "https://122592002.vercel.app"],
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"]
 )
