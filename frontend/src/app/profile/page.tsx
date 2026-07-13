@@ -21,7 +21,6 @@ const statusMap: Record<number, string> = {
 };
 
 export default function Profile() {
-    // 惰性初始化token，彻底删除useEffect内setToken逻辑
     const [token] = useState<string>(() => {
         if (typeof window === "undefined") return "";
         return localStorage.getItem("token") ?? "";
@@ -33,7 +32,6 @@ export default function Profile() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // IIFE异步包裹，规避effect内setLoading警告
         (async () => {
             if (!token) {
                 setLoading(false);
@@ -90,7 +88,6 @@ export default function Profile() {
         })();
     }, [token]);
 
-    // 归还接口PUT，修复405报错
     const returnBook = async (borrowId: number) => {
         if (!confirm("确认归还这本图书？")) return;
         try {
@@ -222,8 +219,9 @@ export default function Profile() {
                                     return (
                                         <tr key={row[0]}>
                                             <td className="border p-3 text-center">{row[0]}</td>
-                                            <td className="border p-3 text-center">{row[4]}</td>
-                                            <td className="border p-3 text-center">{row[5]}</td>
+                                            {/* 修复图书名称下标 row[10] */}
+                                            <td className="border p-3 text-center">{row[10]}</td>
+                                            <td className="border p-3 text-center">{row[3]}</td>
                                             <td className="border p-3 text-center">{row[6]}</td>
                                             <td className="border p-3 text-center">{row[7] ?? "-"}</td>
                                             <td className="border p-3 text-center">{statusMap[statKey]}</td>

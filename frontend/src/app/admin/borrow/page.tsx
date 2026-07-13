@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 
 type BorrowItem = (string | number)[];
-// 强类型状态映射，消除any索引警告
 const statusMap: Record<number, string> = {
     0: "待审批",
     1: "借阅中",
@@ -13,7 +12,6 @@ const statusMap: Record<number, string> = {
 };
 
 export default function AdminBorrowAudit() {
-    // 惰性初始化token，删除useEffect setToken
     const [token] = useState<string>(() => {
         if (typeof window === "undefined") return "";
         return localStorage.getItem("token") ?? "";
@@ -30,7 +28,6 @@ export default function AdminBorrowAudit() {
     };
 
     useEffect(() => {
-        // IIFE异步包裹，消除effect调用setState警告
         (async () => {
             await loadBorrow();
         })();
@@ -75,11 +72,14 @@ export default function AdminBorrowAudit() {
                             return (
                                 <tr key={Number(item[0])}>
                                     <td className="border p-3 text-center">{item[0]}</td>
-                                    <td className="border p-3 text-center">{item[2]}</td>
-                                    <td className="border p-3 text-center">{item[4]}</td>
-                                    <td className="border p-3 text-center">{item[5]}</td>
+                                    {/* 修复：用户名 item[10] */}
+                                    <td className="border p-3 text-center">{item[10]}</td>
+                                    {/* 修复：图书名称 item[11] */}
+                                    <td className="border p-3 text-center">{item[11]}</td>
+                                    <td className="border p-3 text-center">{item[3]}</td>
                                     <td className="border p-3 text-center">{item[6]}</td>
                                     <td className="border p-3 text-center">{item[7] || "-"}</td>
+                                    {/* 修复这里语法错误，删除多余重复字符串 */}
                                     <td className="border p-3 text-center">{statusMap[statKey]}</td>
                                     <td className="border p-3 text-center flex gap-2 justify-center">
                                         {statKey === 0 && (

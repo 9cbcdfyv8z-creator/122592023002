@@ -44,7 +44,7 @@ def init_db():
         cur.execute("ALTER TABLE user ADD COLUMN status INTEGER DEFAULT 1")
     except sqlite3.OperationalError:
         pass
-    # 改动：给admin预置nickname=admin
+    # 预置admin账号
     cur.execute("INSERT OR IGNORE INTO user(username,pwd,nickname,role,status) VALUES (?,?,?,?,?)", ("admin", "123456", "admin", "admin", 1))
 
     # 2. 图书分类表（树形结构 parent_id）
@@ -203,7 +203,6 @@ def login():
         return jsonify({"code":401,"msg":"账号密码错误"})
     if user[3] == 0:
         return jsonify({"code":403,"msg":"账号已封禁"})
-    # 修复utcnow过期警告
     payload = {"uid":user[0], "username":user[1], "role":user[2], "exp":datetime.now(UTC)+timedelta(days=7)}
     token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
     return jsonify({"code":200,"msg":"登录成功","data":{"token":token,"user":user}})
@@ -227,7 +226,7 @@ def register():
     except sqlite3.IntegrityError:
         return jsonify({"code":400,"msg":"用户名/邮箱已存在"})
 
-# 获取个人信息【返回字典，前端可直接点属性取值】
+# 获取个人信息
 @app.route("/api/user/profile", methods=["GET"])
 def get_profile():
     user = get_token_user()
@@ -235,10 +234,8 @@ def get_profile():
         return jsonify({"code":401,"msg":"未登录"})
     uid = user["uid"]
     conn = sqlite3.connect("book.db")
-    # 字段顺序：id,username,nickname,email,avatar,role
     row = conn.execute("SELECT id,username,nickname,email,avatar,role FROM user WHERE id=?", (uid,)).fetchone()
     conn.close()
-    # 转为字典
     data = {
         "id": row[0],
         "username": row[1],
@@ -285,7 +282,7 @@ def change_pwd():
     return jsonify({"code":200,"msg":"密码修改成功"})
 
 # ====================== 2. 管理员-用户管理接口 ======================
-# 用户分页查询（修复SQL注入漏洞）
+# 用户分页查询
 @app.route("/api/admin/user/list", methods=["GET"])
 def admin_user_list():
     if not is_admin():
@@ -330,7 +327,23 @@ def admin_user_edit(uid):
     conn.close()
     return jsonify({"code":200,"msg":"修改成功"})
 
-# 删除/批量删除用户
+# 单条删除用户（修复删除不生效问题，完整执行DELETE）
+@app.route("/api/admin/user/del/<int:uid>", methods=["OPTIONS","DELETE"])
+def admin_user_delete_single(uid):
+    if not is_admin():
+        return jsonify({"code":403,"msg":"无管理员权限"})
+    conn = sqlite3.connect("book.db")
+    borrow_count = conn.execute("SELECT COUNT(*) FROM borrow WHERE user_id=?", (uid,)).fetchone()[0]
+    if borrow_count > 0:
+        conn.close()
+        return jsonify({"code":400,"msg":"该用户存在关联借阅数据无法删除"})
+    # 执行删除SQL
+    conn.execute("DELETE FROM user WHERE id=?", (uid,))
+    conn.commit()
+    conn.close()
+    return jsonify({"code":200,"msg":"删除成功"})
+
+# 批量删除用户
 @app.route("/api/admin/user/del", methods=["DELETE"])
 def admin_user_del():
     if not is_admin():
@@ -338,7 +351,9 @@ def admin_user_del():
     ids = request.get_json().get("ids",[])
     conn = sqlite3.connect("book.db")
     for uid in ids:
-        conn.execute("DELETE FROM user WHERE id=?", (uid,))
+        cnt = conn.execute("SELECT COUNT(*) FROM borrow WHERE user_id=?", (uid,)).fetchone()[0]
+        if cnt == 0:
+            conn.execute("DELETE FROM user WHERE id=?", (uid,))
     conn.commit()
     conn.close()
     return jsonify({"code":200,"msg":"删除完成"})
@@ -350,7 +365,6 @@ def category_tree():
     conn = sqlite3.connect("book.db")
     all_cat = conn.execute("SELECT * FROM category ORDER BY sort").fetchall()
     conn.close()
-    # 递归组装树形
     tree = []
     def build(pid):
         res = []
@@ -411,26 +425,40 @@ def book_list():
     page = int(request.args.get("page",1))
     size = int(request.args.get("size",10))
     cid = request.args.get("category_id","")
-    sort = request.args.get("sort","default") # hot/new/score/collect
+    sort = request.args.get("sort","default")
+    keyword = request.args.get("keyword","").strip()
     offset = (page-1)*size
     conn = sqlite3.connect("book.db")
-    where = ""
+    where_arr = []
     params = []
+    # 分类条件
     if cid:
-        where = "WHERE category_id=?"
+        where_arr.append("category_id=?")
         params.append(cid)
+    # 搜索关键词条件：匹配书名、作者
+    if keyword:
+        where_arr.append("(name LIKE ? OR author LIKE ?)")
+        params.append(f"%{keyword}%")
+        params.append(f"%{keyword}%")
+    # 拼接where语句
+    where_sql = ""
+    if len(where_arr) > 0:
+        where_sql = "WHERE " + " AND ".join(where_arr)
+    # 排序规则
     order = "id DESC"
     if sort == "hot": order = "borrow_count DESC"
     if sort == "new": order = "publish_time DESC"
     if sort == "score": order = "score DESC"
     if sort == "collect": order = "collect_count DESC"
-    total = conn.execute(f"SELECT COUNT(*) FROM book {where}", params).fetchone()[0]
+    # 查询总数
+    total_sql = f"SELECT COUNT(*) FROM book {where_sql}"
+    total = conn.execute(total_sql, params).fetchone()[0]
+    # 查询分页数据
     params.extend([offset, size])
-    sql = f"SELECT * FROM book {where} ORDER BY {order} LIMIT ?,?"
-    list_data = conn.execute(sql, params).fetchall()
+    data_sql = f"SELECT * FROM book {where_sql} ORDER BY {order} LIMIT ?,?"
+    list_data = conn.execute(data_sql, params).fetchall()
     conn.close()
     return jsonify({"code":200,"data":{"list":list_data,"total":total}})
-
 # 单本图书详情
 @app.route("/api/book/<int:bid>", methods=["GET"])
 def book_detail(bid):
@@ -454,7 +482,6 @@ def book_add():
     conn.close()
     return jsonify({"code":200,"msg":"新增图书成功"})
 
-# 这里修正了之前写错的publish_time字段
 @app.route("/api/admin/book/edit/<int:bid>", methods=["PUT"])
 def book_edit(bid):
     if not is_admin(): return jsonify({"code":403,"msg":"无权限"})
@@ -506,7 +533,7 @@ def collect_cancel(bid):
     conn.close()
     return jsonify({"code":200,"msg":"取消收藏"})
 
-# 兼容前端 /api/collect/del/{bid} 路径，解决前端404报错
+# 兼容前端 /api/collect/del/{bid}
 @app.route("/api/collect/del/<int:bid>", methods=["DELETE"])
 def collect_del_alias(bid):
     return collect_cancel(bid)
@@ -547,7 +574,6 @@ def borrow_apply(bid):
     today = datetime.now().strftime("%Y-%m-%d")
     due = (datetime.now()+timedelta(days=days)).strftime("%Y-%m-%d")
     conn = sqlite3.connect("book.db")
-    # 判断库存
     stock = conn.execute("SELECT stock FROM book WHERE id=?", (bid,)).fetchone()[0]
     if stock <=0:
         return jsonify({"code":400,"msg":"库存不足"})
@@ -564,7 +590,7 @@ def borrow_apply(bid):
 def borrow_audit(borrow_id):
     if not is_admin(): return jsonify({"code":403,"msg":"无权限"})
     data = request.get_json()
-    status = data["status"] # 1通过 2驳回
+    status = data["status"]
     conn = sqlite3.connect("book.db")
     borrow_info = conn.execute("SELECT book_id FROM borrow WHERE id=?", (borrow_id,)).fetchone()
     bid = borrow_info[0]
@@ -622,7 +648,7 @@ def my_borrow():
     conn.close()
     return jsonify({"code":200,"data":list_data})
 
-# 管理员借阅列表（筛选逾期/即将到期）
+# 管理员借阅列表
 @app.route("/api/admin/borrow/list", methods=["GET"])
 def admin_borrow_list():
     if not is_admin(): return jsonify({"code":403,"msg":"无权限"})
@@ -656,7 +682,6 @@ def comment_add(bid):
     conn = sqlite3.connect("book.db")
     conn.execute("INSERT INTO comment(user_id,book_id,content,score) VALUES (?,?,?,?)",
                  (uid,bid,content,score))
-    # 更新图书平均分
     all_score = conn.execute("SELECT AVG(score) FROM comment WHERE book_id=?", (bid,)).fetchone()[0]
     if all_score is not None:
         conn.execute("UPDATE book SET score=? WHERE id=?", (round(all_score,1), bid))
@@ -728,7 +753,7 @@ def rec_new():
     conn.close()
     return jsonify({"code":200,"data":res})
 
-# 3.物品协同过滤 ItemCF（同分类同借阅）
+# 3.物品协同过滤 ItemCF
 @app.route("/api/recommend/itemcf/<int:bid>", methods=["GET"])
 def rec_itemcf(bid):
     conn = sqlite3.connect("book.db")
@@ -737,7 +762,7 @@ def rec_itemcf(bid):
     conn.close()
     return jsonify({"code":200,"data":res})
 
-# 4.用户协同过滤 UserCF（同用户借阅记录）
+# 4.用户协同过滤 UserCF
 @app.route("/api/recommend/usercf", methods=["GET"])
 def rec_usercf():
     user = get_token_user()
@@ -748,7 +773,6 @@ def rec_usercf():
     my_book_ids = [row[0] for row in my_book_rows]
     if not my_book_ids:
         return jsonify({"code":200,"data":[]})
-    # 参数化查询，避免SQL注入
     placeholders = ",".join(["?"] * len(my_book_ids))
     other_uid_rows = conn.execute(f"SELECT DISTINCT user_id FROM borrow WHERE book_id IN ({placeholders}) AND user_id != ?", (*my_book_ids, uid)).fetchall()
     other_uids = [row[0] for row in other_uid_rows]
@@ -765,7 +789,7 @@ def rec_usercf():
     conn.close()
     return jsonify({"code":200,"data":rec_book})
 
-# 5.内容推荐（分类匹配）
+# 5.内容推荐
 @app.route("/api/recommend/content", methods=["GET"])
 def rec_content():
     user = get_token_user()
@@ -784,7 +808,7 @@ def rec_content():
     conn.close()
     return jsonify({"code":200,"data":res})
 
-# 6.相似图书推荐（同分类）
+# 6.相似图书推荐
 @app.route("/api/recommend/similar/<int:bid>", methods=["GET"])
 def rec_similar(bid):
     conn = sqlite3.connect("book.db")
@@ -793,7 +817,7 @@ def rec_similar(bid):
     conn.close()
     return jsonify({"code":200,"data":res})
 
-# 7.混合推荐（合并热门+内容推荐）
+# 7.混合推荐
 @app.route("/api/recommend/mix", methods=["GET"])
 def rec_mix():
     user = get_token_user()
@@ -809,7 +833,6 @@ def rec_mix():
             my_cat_ids = [row[0] for row in my_cat_rows]
             cat_placeholders = ",".join(["?"] * len(my_cat_ids))
             content = conn.execute(f"SELECT * FROM book WHERE category_id IN ({cat_placeholders}) LIMIT 4", my_cat_ids).fetchall()
-    # 去重合并
     mix_map = {}
     for item in hot + content:
         mix_map[item[0]] = item
