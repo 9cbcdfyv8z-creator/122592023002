@@ -65,7 +65,7 @@ export default function Home() {
         <Link href={`/book/${book[0]}`} className="bg-white rounded-xl shadow p-4 block">
             <div className="h-36 bg-slate-100 rounded mb-3 overflow-hidden">
                 <img
-                    src={book[6]}
+                    src={book[6] ?? ""}
                     alt={book[1]}
                     className="w-full h-full object-cover"
                     onError={(e) => {

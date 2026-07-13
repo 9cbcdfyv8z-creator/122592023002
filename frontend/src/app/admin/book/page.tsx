@@ -182,7 +182,11 @@ export default function AdminBookManage() {
                                     {cateList.map(c => (
                                         <optgroup key={c.id} label={c.name}>
                                             <option value={c.id}>{c.name}</option>
-                                            {c.children.map(child => <option key={child.id} value={child.id}>{child.name}</option>)}
+                                            {c.children.map((child: { id: number; name: string }) => (
+                                                <option key={child.id} value={child.id}>
+                                                    {child.name}
+                                                </option>
+                                            ))}
                                         </optgroup>
                                     ))}
                                 </select>

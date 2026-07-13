@@ -43,7 +43,7 @@ export default function HotRankPage() {
                             {/* 新增封面渲染区域 */}
                             <div className="h-40 bg-slate-100 rounded mb-4 overflow-hidden">
                                 <img
-                                    src={book[6]}
+                                    src={book[6] ?? ""}
                                     alt={book[1]}
                                     className="w-full h-full object-cover"
                                     onError={(e) => {
