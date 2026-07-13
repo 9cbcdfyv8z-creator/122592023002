@@ -37,7 +37,8 @@ export default function Home() {
                 // 个性化推荐：无数据自动兜底热门图书
                 if (token) {
                     try {
-                        const recRes = await axios.get("http://127.0.0.1:5000/api/recommend/personal", {
+                        // 仅此处修改：将不存在的personal替换为usercf接口
+                        const recRes = await axios.get("http://127.0.0.1:5000/api/recommend/usercf", {
                             headers: { Authorization: `Bearer ${token}` }
                         });
                         if (recRes.data.data.length > 0) {
