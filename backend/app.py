@@ -16,7 +16,7 @@ CORS(
     app,
     supports_credentials=True,
     origins=["http://localhost:3000",
-        "https://122592002.vercel.app"],
+        "https://lucent-sundae-f538d6.netlify.app"],
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"]
 )
