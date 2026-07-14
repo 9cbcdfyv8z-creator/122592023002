@@ -16,7 +16,8 @@ CORS(
     app,
     supports_credentials=True,
     origins=["http://localhost:3000",
-        "https://lucent-sundae-f538d6.netlify.app"],
+        "https://lucent-sundae-f538d6.netlify.app",
+        "https://illustrious-kulfi-a69a0c.netlify.app"],
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"]
 )
@@ -152,8 +153,6 @@ def init_db():
         )
         ''')
         conn.commit()
-
-init_db()
 
 # ====================== 工具函数 ======================
 def get_token_user():
@@ -395,7 +394,7 @@ def category_tree():
     def build(pid):
         res = []
         for item in all_cat:
-            cid,name,parent,sort = item
+            cid, name, parent, sort = item
             if parent == pid:
                 children = build(cid)
                 res.append({"id":cid,"name":name,"children":children})
@@ -859,5 +858,8 @@ def rec_mix():
         mix = list(mix_map.values())[:8]
     return jsonify({"code":200,"data":mix})
 
+# ====================== 程序入口（仅本地调试时初始化数据库，线上Web启动不会执行init_db） ======================
 if __name__ == "__main__":
+    # 只有手动运行python app.py才会初始化数据库，PythonAnywhere Web托管启动不会执行这里
+    init_db()
     app.run(debug=True, use_reloader=False, port=5000)
