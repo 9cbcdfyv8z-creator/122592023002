@@ -28,17 +28,17 @@ export default function BookDetail() {
 
     // 加载图书详情
     const loadDetail = async () => {
-        const res = await axios.get(`http://127.0.0.1:5000/api/book/${bid}`);
+        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/book/${bid}`);
         setBook(res.data.data);
         // 判断收藏状态
         if (token) {
-            const collectRes = await axios.get(`http://127.0.0.1:5000/api/collect/check/${bid}`, {
+            const collectRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/collect/check/${bid}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setIsCollected(collectRes.data.data);
         }
         // 加载评论
-        const cmtRes = await axios.get(`http://127.0.0.1:5000/api/book/comment/${bid}`);
+        const cmtRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/book/comment/${bid}`);
         setCommentList(cmtRes.data.data);
     };
 
@@ -50,7 +50,7 @@ export default function BookDetail() {
     const applyBorrow = async () => {
         if (!token) return alert("请先登录");
         try {
-            await axios.post(`http://127.0.0.1:5000/api/borrow/apply/${bid}`, { days: borrowDays }, {
+            await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/borrow/apply/${bid}`, { days: borrowDays }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             alert("借阅申请提交成功，等待管理员审核");
@@ -64,13 +64,13 @@ export default function BookDetail() {
         if (!token) return alert("请先登录");
         try {
             if (isCollected) {
-                await axios.delete(`http://127.0.0.1:5000/api/collect/cancel/${bid}`, {
+                await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/collect/cancel/${bid}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setIsCollected(false);
                 alert("已取消收藏");
             } else {
-                await axios.post(`http://127.0.0.1:5000/api/collect/add/${bid}`, {}, {
+                await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/collect/add/${bid}`, {}, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setIsCollected(true);
@@ -86,7 +86,7 @@ export default function BookDetail() {
         if (!token) return alert("请先登录");
         if (!commentText.trim()) return alert("评论内容不能为空");
         try {
-            await axios.post(`http://127.0.0.1:5000/api/comment/add/${bid}`, {
+            await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/comment/add/${bid}`, {
                 content: commentText,
                 score: commentScore
             }, {
@@ -210,4 +210,4 @@ export default function BookDetail() {
             </div>
         </div>
     );
-} 
+}
