@@ -57,10 +57,10 @@
 2. 安装依赖：`npm install`
 3. 删除缓存文件夹`.next`，清除路由缓存避免页面不刷新
 4. 启动项目：
-## Windows PowerShell 启动命令
+Windows PowerShell 启动命令:
 $env:NEXT_PUBLIC_API_URL="http://127.0.0.1:5000"
 npm run dev
-## CMD 启动命令
+CMD 启动命令:
 set NEXT_PUBLIC_API_URL=http://127.0.0.1:5000 && npm run dev
 5. 前端访问地址：`http://localhost:3000`
 
